@@ -27,12 +27,12 @@ flowchart TD
 
 ## API contract and assumptions
 
-- `POST /api/events` returns `202 {"eventId", "status": "RECEIVED"}`. Sending the same `eventId` with the same payload again returns `202` with the current status, so client retries are safe. The same `eventId` with a different payload returns `409`.
+- `POST /api/events` returns `202 {"eventId", "status": "RECEIVED"}` with a `Location` header pointing to `/api/events/{eventId}`. Sending the same `eventId` with the same payload again returns `202` with the current status, so client retries are safe. The same `eventId` with a different payload returns `409`.
 - `GET /api/events/{eventId}` returns the fields from the assignment (`eventId`, `customerId`, `type`, `amount`, `currency`, `status`, `createdAt`, `processedAt`) plus `timestamp` and `failureReason`. `createdAt` is when the service received the event; `timestamp` is when it happened.
-- `GET /api/customers/{customerId}/events` filters `from`/`to` on `timestamp` (inclusive, ISO-8601), optionally by `status`, newest first. `page` starts at 0, `size` defaults to 20, maximum 100.
+- `GET /api/customers/{customerId}/events` filters `from`/`to` on `timestamp` (inclusive, ISO-8601), optionally by `status`, newest first (`timestamp`, then `eventId`). `page` starts at 0, `size` defaults to 20, maximum 100; a larger `size` or `from` after `to` returns `400`. The response is `{"content", "page", "size", "totalElements", "totalPages"}`. A customer with no events gets an empty page, not `404`.
 - Event types are `PAYMENT` and `REFUND`. Amounts are positive with at most 2 decimals; currency is an ISO 4217 code. Currencies with 0 or 3 minor units are a simplification I accepted.
 - The business logic is simulated and touches nothing outside MongoDB: amounts above a configurable maximum fail permanently.
-- Errors are RFC 7807 `ProblemDetail`: 400 validation, 404, 409, 503 when MongoDB is unreachable.
+- Errors are RFC 7807 `ProblemDetail`: 400 validation, with an `errors` list naming each failing field, 404, 409, 503 when MongoDB is unreachable, and 500 for anything else, without internal details.
 
 ## Components
 

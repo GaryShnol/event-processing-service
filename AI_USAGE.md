@@ -1,0 +1,31 @@
+# AI usage
+
+> Draft. The implementation sections are finished at the end; the log grows as I work.
+
+## Tools
+
+- Claude (chat and voice), to review my first design, argue through the trade-offs, and draft `ARCHITECTURE.md` and `CLAUDE.md`, which I then edited.
+- Claude Code, for the implementation, working from `CLAUDE.md`.
+
+## How I worked with it
+
+I fixed the design before any code was written and wrote it down in `ARCHITECTURE.md`. `CLAUDE.md` gives Claude Code the code rules and five phases, each on its own branch with criteria I can check. Claude Code builds a phase and stops; a separate agent that didn't write the code reviews the diff; then I review the PR myself and merge it. I kept the push and the merge for myself on purpose.
+
+<!-- End: which parts Claude Code wrote, which I changed, where I stepped in. -->
+
+## How I verified the output
+
+<!-- End: the concurrency and recovery integration tests as the evidence, the clean-clone check, reading every PR diff. -->
+
+## Where I accepted, rejected or corrected the AI
+
+| # | What the AI suggested | What happened | Why |
+| --- | --- | --- | --- |
+| 1 | My first AI-generated design summary listed "MongoDB (Mongoose)" | Rejected | Mongoose is a Node.js library. The stack is Java, so Spring Data MongoDB |
+| 2 | That same summary treated a DLQ redrive policy as the whole failure strategy | Extended | A dead-lettered message left the event stuck in `PROCESSING`, so `GET` would show the wrong status. Now MongoDB decides when an event is `FAILED`, and a sweeper handles stuck events |
+| 3 | Claude pointed out that my plan of Mockito-only tests couldn't prove the concurrency guarantees | Accepted | A mock can't show that a unique index or `findAndModify` prevents a race. The concurrency tests run on real MongoDB |
+| 4 | Claude's plan used four indexes, two of them for the customer query | I pushed back | I asked why not a single index on customer, status and timestamp. That order would have broken range and sort when no status is sent, but the question led to one index ordered `customerId, occurredAt, _id, status` that covers both cases. Two indexes became one |
+| 5 | I wanted Kafka instead of SQS | I accepted the pushback | The assignment asks for SQS explicitly, and for a work queue SQS fits better. Kafka on MSK is documented as the path if consumers ever need replay |
+| 6 | Claude's plan used LocalStack for local SQS | Replaced with ElasticMQ | When checked, the current LocalStack image turned out to need an account and auth token since March 2026, so `docker compose up` would fail for a reviewer |
+| 7 | Claude recommended Spring Boot 3.5 as the safer choice | Rejected when checked | Spring Boot 3.5 reached end of open-source support in June 2026. A production-oriented service shouldn't start on it, so Spring Boot 4.x |
+| 8 | Claude's first plan was about 8 hours, including custom metrics | Cut | The assignment estimates 4 to 6 hours. I kept logs with `eventId` and health checks, and listed the metrics as production work |

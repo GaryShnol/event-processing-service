@@ -74,11 +74,11 @@ Project with the stack above, config properties record, `elasticmq.conf` (`event
 
 ### 4. `feature/failure-recovery`
 Transient exceptions propagate (no ack), `StuckEventSweeper` (fail exhausted, re-publish stuck, batched, can be disabled), publish failure in create is logged and the request still returns `202`.
-- [ ] Transient failure then success: `PROCESSED` with `attempts = 2`
-- [ ] Expired `PROCESSING` with no message in the queue: the sweeper gets it to `PROCESSED`
-- [ ] `RECEIVED` whose publish failed: the sweeper gets it to `PROCESSED`
-- [ ] Failing `maxAttempts` times: `FAILED` with "max attempts exceeded"
-- [ ] Unparseable message lands in `events-dlq`
+- [x] Transient failure then success: `PROCESSED` with `attempts = 2`
+- [x] Expired `PROCESSING` with no message in the queue: the sweeper gets it to `PROCESSED`
+- [x] `RECEIVED` whose publish failed: the sweeper gets it to `PROCESSED`
+- [x] Failing `maxAttempts` times: `FAILED` with "max attempts exceeded"
+- [x] Unparseable message lands in `events-dlq`
 
 ### 5. `docs/final-documentation`
 `README.md` (both ways to run, how to test, a curl for every endpoint, key decisions in a few lines linking to `ARCHITECTURE.md`). Update `ARCHITECTURE.md` to match the code. Finish `AI_USAGE.md`. Plain, concise prose, first person for decisions, no filler.

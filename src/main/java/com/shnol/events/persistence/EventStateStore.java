@@ -86,9 +86,14 @@ public class EventStateStore {
 				.and("attempts").gte(maxAttempts));
 	}
 
-	/** Records a re-publish, unless another sweeper has recorded one since previousPublishedAt was read. */
+	/**
+	 * Records a re-publish, unless the event has finished or another sweeper has recorded one since
+	 * previousPublishedAt was read.
+	 */
 	public void markRepublished(String eventId, Instant previousPublishedAt) {
-		Query query = Query.query(Criteria.where("_id").is(eventId).and("lastPublishedAt").is(previousPublishedAt));
+		Query query = Query.query(Criteria.where("_id").is(eventId)
+				.and("status").in(EventStatus.RECEIVED, EventStatus.PROCESSING)
+				.and("lastPublishedAt").is(previousPublishedAt));
 		mongoTemplate.updateFirst(query, new Update().set("lastPublishedAt", clock.instant()), Event.class);
 	}
 

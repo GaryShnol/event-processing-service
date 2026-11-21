@@ -233,6 +233,15 @@ class EventStateStoreTest extends IntegrationTest {
 	}
 
 	@Test
+	void markRepublishedLeavesAFinishedEventUntouched() {
+		Event processed = insert(EventStatus.PROCESSED, 1, "token", Instant.now().minusSeconds(1));
+
+		stateStore.markRepublished(processed.eventId(), processed.lastPublishedAt());
+
+		assertThat(repository.findById(processed.eventId())).contains(processed);
+	}
+
+	@Test
 	void exhaustedQueryUsesTheSweeperIndex() {
 		Document plan = mongoTemplate.getCollection("events")
 				.find(EventStateStore.exhaustedQuery(Instant.now(), 3).getQueryObject()).explain();

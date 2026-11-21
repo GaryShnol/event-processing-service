@@ -42,7 +42,7 @@ flowchart TD
 | `application` | `EventService` (create, query), `EventProcessingService` (claim, process, complete) |
 | `domain` | `Event`, `EventStatus`, `EventType`, `EventProcessor` (business rule) |
 | `persistence` | `EventRepository` (reads, insert), `EventStateStore` (atomic transitions), `IndexInitializer` |
-| `messaging` | `EventPublisher`, `EventMessageListener` |
+| `messaging` | `EventPublisher`, `EventMessageListener`, `EventMessageErrorHandler`, `QueueSettingsCheck` |
 | `recovery` | `StuckEventSweeper` |
 
 ## Event lifecycle
@@ -112,10 +112,10 @@ Process:
 4. A permanent business error sets `FAILED` the same way. Any other exception is not caught: the listener's error handler logs it with `eventId` and rethrows, so the message is not acknowledged and SQS redelivers it.
 
 Recover (sweeper, every 30 s, using `@Scheduled`; `SWEEPER_ENABLED=false` turns it off on an instance):
-1. Mark `PROCESSING` events with an expired lease and no attempts left as `FAILED` with "max attempts exceeded", in one `updateMany`. A lease that is still held is never matched.
-2. Re-publish up to 100 `RECEIVED` events, and `PROCESSING` events with an expired lease, whose `lastPublishedAt` is older than 2 minutes. After each publish, a conditional update sets `lastPublishedAt` to now unless another sweeper already did, so the same event isn't re-sent every run. A publish failure ends the run and the next run continues.
+1. Mark `PROCESSING` events with an expired lease and no attempts left as `FAILED` with "max attempts exceeded", in one `updateMany`. A lease that is still held is never matched. Because it is one update, this transition is logged as a count per run, not per event.
+2. Re-publish up to 100 `RECEIVED` events, and `PROCESSING` events with an expired lease, whose `lastPublishedAt` is older than 2 minutes. After each publish, a conditional update sets `lastPublishedAt` to now unless the event has finished or another sweeper already did, so the same event isn't re-sent every run. A publish failure ends the run and the next run continues.
 
-Each run logs how many events it failed and re-published. Interval, age and batch size are configurable.
+Each run that completes logs how many events it failed and re-published. Interval, age and batch size are configurable.
 
 ## Idempotency
 
@@ -183,7 +183,7 @@ ECS on Fargate with two services from one image: `api` behind an ALB and `worker
 
 ## Monitoring
 
-Implemented: JSON logs with `eventId` in the MDC on every line the service writes, so one event can be followed from `POST` to `PROCESSED`, and `/actuator/health` including MongoDB. When processing throws, the service logs the failure with `eventId` and the message stays on the queue; Spring Cloud AWS then writes its own "Error processing message" line with the stack trace, which carries only the SQS message id. A body that can't be converted to a message with an `eventId` is logged by the framework, which includes the body, and is left on the queue until it goes to the DLQ.
+Implemented: JSON logs with `eventId` in the MDC on every line the service writes about a single event, so one event can be followed from `POST` to `PROCESSED`, and `/actuator/health` including MongoDB. When processing throws, the service logs the failure with `eventId` and the message stays on the queue; Spring Cloud AWS then writes its own "Error processing message" line with the stack trace, which carries only the SQS message id. A body that can't be converted to a message with an `eventId` is logged by the framework, which includes the body, and is left on the queue until it goes to the DLQ.
 
 For production I'd add counters for received, duplicate, processed and failed events, a processing-time histogram and a gauge of stuck events, plus alarms on DLQ depth above zero, `ApproximateAgeOfOldestMessage`, stuck events and the 5xx rate. Tracing with OpenTelemetry, carrying the trace context in SQS message attributes, would join API and worker spans.
 

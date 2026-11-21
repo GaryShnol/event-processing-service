@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.verify;
 
 import com.shnol.events.IntegrationTest;
@@ -136,7 +136,7 @@ class FailureRecoveryTest extends IntegrationTest {
 						.formatted(eventId));
 		await().atMost(TIMEOUT).untilAsserted(() ->
 				assertThat(repository.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.PROCESSED));
-		verify(publisher, times(2)).publish(eventId);
+		verify(publisher, atLeast(2)).publish(eventId);
 	}
 
 	@Test

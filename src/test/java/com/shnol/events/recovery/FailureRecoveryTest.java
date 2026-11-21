@@ -80,6 +80,24 @@ class FailureRecoveryTest extends IntegrationTest {
 		awaitInDeadLetterQueue(body);
 	}
 
+	@Test
+	void messageWithoutEventIdLandsInTheDeadLetterQueue() {
+		String body = "{\"note\":\"%s\"}".formatted(UUID.randomUUID());
+
+		send(body);
+
+		awaitInDeadLetterQueue(body);
+	}
+
+	@Test
+	void messageWithBlankEventIdLandsInTheDeadLetterQueue() {
+		String body = "{\"eventId\":\" \",\"note\":\"%s\"}".formatted(UUID.randomUUID());
+
+		send(body);
+
+		awaitInDeadLetterQueue(body);
+	}
+
 	private void send(String body) {
 		sqsClient.sendMessage(request -> request.queueUrl(queueUrl(properties.queues().events())).messageBody(body)).join();
 	}

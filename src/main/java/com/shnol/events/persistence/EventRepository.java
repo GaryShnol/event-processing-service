@@ -41,6 +41,18 @@ public class EventRepository {
 		return PageableExecutionUtils.getPage(content, pageable, () -> mongoTemplate.count(query, Event.class));
 	}
 
+	/** Events to re-publish: RECEIVED, or PROCESSING with an expired lease, last published before publishedBefore. */
+	public List<Event> findStuck(Instant now, Instant publishedBefore, int limit) {
+		return mongoTemplate.find(stuckQuery(now, publishedBefore).limit(limit), Event.class);
+	}
+
+	// The status $in repeats the sweeper index's partial filter, so the planner can use that index.
+	static Query stuckQuery(Instant now, Instant publishedBefore) {
+		return Query.query(Criteria.where("status").in(EventStatus.RECEIVED, EventStatus.PROCESSING)
+				.and("lastPublishedAt").lt(publishedBefore)
+				.orOperator(Criteria.where("status").is(EventStatus.RECEIVED), Criteria.where("lockedUntil").lt(now)));
+	}
+
 	static Query pagedQuery(Query query, Pageable pageable) {
 		return Query.of(query).with(pageable).with(NEWEST_FIRST);
 	}

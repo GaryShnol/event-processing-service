@@ -21,6 +21,8 @@ events:
   max-attempts: ${PROCESSING_MAX_ATTEMPTS:3}
   max-amount: ${MAX_AMOUNT:10000.00}
   sweeper:
+    # false turns the recovery sweeper off on this instance.
+    enabled: ${SWEEPER_ENABLED:true}
     interval: ${SWEEPER_INTERVAL:30s}
     republish-after: ${SWEEPER_REPUBLISH_AFTER:2m}
     batch-size: ${SWEEPER_BATCH_SIZE:100}

@@ -173,7 +173,7 @@ An event is stored as `RECEIVED` and its `eventId` is put on the queue. A worker
 ## Key decisions
 
 - MongoDB is the source of truth and the queue carries only the `eventId`, so a lost or duplicated message can delay an event but never corrupt it. [Overview](ARCHITECTURE.md#overview)
-- `_id` is the `eventId`: duplicate and concurrent `POST`s are decided by the unique index, never by a lookup first. [Idempotency](ARCHITECTURE.md#idempotency)
+- `_id` is the `eventId`: duplicate and concurrent `POST`s are decided by the unique index, never by a lookup first. [Idempotency and race conditions](ARCHITECTURE.md#idempotency-and-race-conditions)
 - A worker claims an event with one atomic `findAndModify` and a lease, and completes it only with its own claim token. [Processing flow](ARCHITECTURE.md#processing-flow)
 - SQS redelivery is the retry; MongoDB counts attempts and decides when an event is `FAILED`; a sweeper re-publishes events whose message was never sent or got lost. [Failure handling and retries](ARCHITECTURE.md#failure-handling-and-retries)
 - One compound index serves the customer query with and without `status`; a partial index keeps the sweeper's scan small. [Data model and indexes](ARCHITECTURE.md#data-model-and-indexes)

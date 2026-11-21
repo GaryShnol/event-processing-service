@@ -21,7 +21,7 @@ flowchart TD
     L -->|5. business logic| P[EventProcessor]
     L -->|6. conditional complete| DB
     Q -.->|after 5 receives| DLQ[[SQS events-dlq]]
-    R[Sweeper, every 30 s] -->|find stuck| DB
+    R[StuckEventSweeper, every 30 s] -->|find stuck| DB
     R -->|re-publish| Q
 ```
 
@@ -31,19 +31,22 @@ flowchart TD
 - `GET /api/events/{eventId}` returns the fields from the assignment (`eventId`, `customerId`, `type`, `amount`, `currency`, `status`, `createdAt`, `processedAt`) plus `timestamp` and `failureReason`. `createdAt` is when the service received the event; `timestamp` is when it happened.
 - `GET /api/customers/{customerId}/events` filters `from`/`to` on `timestamp` (inclusive, ISO-8601), optionally by `status`, newest first (`timestamp`, then `eventId`). `page` starts at 0, `size` defaults to 20, maximum 100; a larger `size` or `from` after `to` returns `400`. The response is `{"content", "page", "size", "totalElements", "totalPages"}`. A customer with no events gets an empty page, not `404`.
 - Event types are `PAYMENT` and `REFUND`. Amounts are positive with at most 2 decimals and 15 integer digits; currency is an ISO 4217 code in upper case. `eventId` and `customerId` are 1 to 64 letters, digits, `_` or `-`. `timestamp` is stored to the millisecond. `metadata` is an optional map of strings with at most 20 entries, keys of 1 to 64 letters, digits, `_` or `-`, and values up to 256 characters; these three bounds are configurable. Currencies with 0 or 3 minor units are a simplification I accepted.
-- The business logic is simulated and touches nothing outside MongoDB: amounts above a configurable maximum fail permanently.
-- Errors are RFC 7807 `ProblemDetail`: 400 validation, with an `errors` list naming each failing field, 404, 409, 503 when MongoDB is unreachable, and 500 for anything else, without internal details.
+- The business logic is simulated and touches nothing outside MongoDB: an amount above a configurable maximum (10000.00 by default) fails permanently.
+- `GlobalExceptionHandler` returns RFC 7807 `ProblemDetail`: 400 with an `errors` list naming each failing field or query parameter (a body that isn't valid JSON gets 400 without the list), 404, 409, 503 when MongoDB doesn't answer within 5 seconds, and 500 for anything else. No response carries a stack trace or a library's exception message.
 
 ## Components
 
 | Package | Responsibility |
 | --- | --- |
-| `api` | Controllers, request/response DTOs, validation, error handling |
-| `application` | `EventService` (create, query), `EventProcessingService` (claim, process, complete) |
-| `domain` | `Event`, `EventStatus`, `EventType`, `EventProcessor` (business rule) |
+| `api` | `EventController`, request and response records with Bean Validation, `GlobalExceptionHandler`, `EventIdMdcFilter` |
+| `application` | `EventService` (create, get, customer query), `EventProcessingService` (claim, run the rule, complete or fail) |
+| `domain` | `Event`, `NewEvent` (with the payload hash), `EventStatus`, `EventType`, `EventProcessor` (the business rule) |
 | `persistence` | `EventRepository` (reads, insert), `EventStateStore` (atomic transitions), `IndexInitializer` |
-| `messaging` | `EventPublisher`, `EventMessageListener`, `EventMessageErrorHandler`, `QueueSettingsCheck` |
+| `messaging` | `EventPublisher` and `SqsEventPublisher`, `EventMessageListener`, `EventMessageErrorHandler`, `QueueSettingsCheck` |
 | `recovery` | `StuckEventSweeper` |
+| `config` | `EventsProperties` (every limit, timeout and queue name), the `Clock` |
+
+`domain` depends on nothing else in the app. The stack is Java 21, Spring Boot 4.1 with Spring Data MongoDB, Spring Cloud AWS 4.1 for SQS (`SqsTemplate` to send, `@SqsListener` to receive), MongoDB 8.0, and ElasticMQ as SQS locally and in tests.
 
 ## Event lifecycle
 
@@ -75,14 +78,13 @@ One document per event in the `events` collection:
   "claimToken": "uuid of the current claim",
   "lockedUntil": "2026-09-13T20:16:02Z",
   "lastPublishedAt": "2026-09-13T20:15:01Z",
-  "failureReason": null,
   "createdAt": "2026-09-13T20:15:01Z",
   "updatedAt": "2026-09-13T20:15:02Z",
   "processedAt": "2026-09-13T20:15:02Z"
 }
 ```
 
-`amount` is `BigDecimal` in Java and `Decimal128` in MongoDB, never a float. `payloadHash` is computed over normalised fields, so `1250.5` and `1250.50` count as the same payload.
+`amount` is `BigDecimal` in Java and `Decimal128` in MongoDB, never a float. `failureReason` is only present on a `FAILED` event. `payloadHash` is computed over normalised fields, so `1250.5` and `1250.50` count as the same payload.
 
 `IndexInitializer` creates the indexes at startup so they are visible in code:
 
@@ -111,20 +113,22 @@ Process:
 3. Run the business logic, then complete with a conditional update on `status = PROCESSING` and my `claimToken`. If it matches nothing, my lease expired and another worker owns the event.
 4. A permanent business error sets `FAILED` the same way. Any other exception is not caught: the listener's error handler logs it with `eventId` and rethrows, so the message is not acknowledged and SQS redelivers it.
 
-Recover (sweeper, every 30 s, using `@Scheduled`; `SWEEPER_ENABLED=false` turns it off on an instance):
+Recover (`StuckEventSweeper`, `@Scheduled` with 30 s between runs; `SWEEPER_ENABLED=false` turns it off on an instance):
 1. Mark `PROCESSING` events with an expired lease and no attempts left as `FAILED` with "max attempts exceeded", in one `updateMany`. A lease that is still held is never matched. Because it is one update, this transition is logged as a count per run, not per event.
 2. Re-publish up to 100 `RECEIVED` events, and `PROCESSING` events with an expired lease, whose `lastPublishedAt` is older than 2 minutes. After each publish, a conditional update sets `lastPublishedAt` to now unless the event has finished or another sweeper already did, so the same event isn't re-sent every run. A publish failure ends the run and the next run continues.
 
 Each run that completes logs how many events it failed and re-published. Interval, age and batch size are configurable.
 
-## Idempotency
+## Idempotency and race conditions
 
-| Duplicate source | What stops it |
+| Duplicate or race | What stops it |
 | --- | --- |
 | Client retries, concurrent `POST`s | Unique `_id` |
-| SQS delivers a message twice | Atomic claim; the second delivery matches nothing |
+| SQS delivers a message twice, or two workers get it at once | Atomic claim; only one `findAndModify` matches |
 | Sweeper and SQS both resend | Same |
-| A worker whose lease expired | `claimToken` check on completion |
+| A worker whose lease expired finishes late | `claimToken` check on completion |
+| Sweeper fails an event while a worker is on its last attempt | The sweeper only matches an expired lease |
+| Two sweepers re-publish the same event | Harmless; `lastPublishedAt` is moved only if no one moved it since the read |
 
 The lease makes MongoDB state change exactly once. It can't do that for a call to an external system: a worker could make the call and crash before recording it. Here the business logic has no external side effects and its result is written in the same update that sets `PROCESSED`. If it ever calls another system, `eventId` has to go along as an idempotency key.
 
@@ -146,7 +150,7 @@ Retry strategy: there are no in-process retries. SQS redelivery is the retry, wi
 
 I check both rules at startup against the real queue: the app reads the visibility timeout and the redrive policy's `maxReceiveCount` of the events queue and refuses to start if the lease isn't shorter than the visibility timeout or `maxAttempts` isn't lower than `maxReceiveCount`.
 
-The DLQ is a redrive policy, so no code moves messages there. Messages in it trigger an alarm. After fixing the cause, the operator redrives them (`StartMessageMoveTask`) or discards them; discarding is safe for valid events because the sweeper will publish them again.
+The DLQ is a redrive policy, so no code moves messages there. In production an alarm on its depth tells an operator, who fixes the cause and then redrives the messages (`StartMessageMoveTask`) or discards them; discarding is safe for valid events because the sweeper will publish them again.
 
 ## Decisions and trade-offs
 
@@ -160,13 +164,18 @@ The DLQ is a redrive policy, so no code moves messages there. Messages in it tri
 | Single-document atomic updates | MongoDB transactions | Every correctness-critical change touches one document. Transactions would also need a replica set locally |
 | Logs and health checks only | Custom Micrometer metrics | Keeps the scope near the 4 to 6 hour estimate; the production metrics are listed under Monitoring |
 | Offset paging | Keyset paging | Matches the requested `page`/`size`; keyset is the scaling path |
-| Spring Boot 4.x | Spring Boot 3.5 | 3.5 reached end of open-source support in June 2026 |
+| Spring Boot 4.1 | Spring Boot 3.5 | 3.5 reached end of open-source support in June 2026 |
+| Spring Cloud AWS 4.1.1 on Boot 4.1.3 | Boot 4.0.x, which 4.1.1 is built against | No release documents Boot 4.1, so I tested it: a round-trip test sends with `SqsTemplate` and receives with `@SqsListener`, with Jackson 3 converting the body both ways. No Jackson 2 bridge is needed |
 
 ## Scaling and bottlenecks
 
-The API and the worker are stateless and scale horizontally; one image runs both, and configuration switches the listener or the API off. Workers scale on queue depth.
+The API and the worker are stateless and scale horizontally from one image. `SQS_LISTENER_ENABLED=false` makes an instance publish events without consuming them, and `SWEEPER_ENABLED=false` turns its sweeper off. Workers scale on queue depth.
 
 The likely bottlenecks are MongoDB writes (one insert and two or three updates per event), deep pages for customers with millions of events, and the sweeper during a long backlog, when it re-publishes events that are only waiting. `lastPublishedAt`, the batch size and a `republishAfter` above normal queue latency limit that.
+
+## Testing
+
+Unit tests with Mockito cover the decisions inside a class. Everything that depends on MongoDB or SQS behaviour runs against real MongoDB 8.0 and ElasticMQ in Testcontainers: duplicate `POST`s, concurrent claims, stale tokens, index use (checked with `explain`), redelivery, the sweeper and the DLQ. The ElasticMQ test container loads the production `elasticmq.conf` unchanged, plus `fast-events-queue` with a 2-second visibility timeout and the same redrive to its own DLQ after 5 receives. Recovery tests use it with a 1-second lease, so redelivery and dead-letter cases take seconds and still pass the startup check. `./mvnw verify` fails below 80% line coverage.
 
 ## Adding other consumers
 

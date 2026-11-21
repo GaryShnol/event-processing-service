@@ -6,15 +6,6 @@ spring:
     name: event-processing-service
   mongodb:
     uri: ${MONGODB_URI:mongodb://localhost:27017/events}
-  cloud:
-    aws:
-      region:
-        static: ${AWS_REGION:us-east-1}
-      credentials:
-        access-key: ${AWS_ACCESS_KEY_ID:local}
-        secret-key: ${AWS_SECRET_ACCESS_KEY:local}
-      sqs:
-        endpoint: ${SQS_ENDPOINT:http://localhost:9324}
 
 events:
   queues:

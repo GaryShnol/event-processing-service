@@ -32,9 +32,13 @@ class TestcontainersConfiguration {
 	// Spring Cloud AWS only offers @ServiceConnection for LocalStack, so ElasticMQ is wired by property.
 	@Bean
 	DynamicPropertyRegistrar elasticMqProperties(GenericContainer<?> elasticMqContainer) {
-		return registry -> registry.add("spring.cloud.aws.sqs.endpoint",
-				() -> "http://%s:%d".formatted(elasticMqContainer.getHost(),
-						elasticMqContainer.getMappedPort(ELASTICMQ_PORT)));
+		return registry -> {
+			registry.add("spring.cloud.aws.sqs.endpoint", () -> "http://%s:%d".formatted(
+					elasticMqContainer.getHost(), elasticMqContainer.getMappedPort(ELASTICMQ_PORT)));
+			registry.add("spring.cloud.aws.region.static", () -> "us-east-1");
+			registry.add("spring.cloud.aws.credentials.access-key", () -> "local");
+			registry.add("spring.cloud.aws.credentials.secret-key", () -> "local");
+		};
 	}
 
 }

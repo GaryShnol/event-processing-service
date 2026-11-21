@@ -2,7 +2,7 @@ services:
   mongo:
     image: mongo:8.0.38
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
       interval: 5s
@@ -13,7 +13,7 @@ services:
   elasticmq:
     image: softwaremill/elasticmq-native:1.7.1
     ports:
-      - "9324:9324"
+      - "127.0.0.1:9324:9324"
     volumes:
       - ./elasticmq.conf:/opt/elasticmq.conf:ro
     healthcheck:
@@ -30,8 +30,9 @@ services:
     env_file:
       - path: .env
         required: false
-    # Container hostnames; these take precedence over the localhost values in .env.
+    # These take precedence over .env: container hostnames, and the port the mapping and health check use.
     environment:
+      SERVER_PORT: 8080
       MONGODB_URI: mongodb://mongo:27017/events
       SQS_ENDPOINT: http://elasticmq:9324
     depends_on:

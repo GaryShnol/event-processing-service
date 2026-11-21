@@ -183,8 +183,8 @@ An event is stored as `RECEIVED` and its `eventId` is put on the queue. A worker
 - A worker claims an event with one atomic `findAndModify` and a lease, and completes it only with its own claim token. [Processing flow](ARCHITECTURE.md#processing-flow)
 - SQS redelivery is the retry; MongoDB counts attempts and decides when an event is `FAILED`; a sweeper re-publishes events whose message was never sent or got lost. [Failure handling and retries](ARCHITECTURE.md#failure-handling-and-retries)
 - One compound index serves the customer query with and without `status`; a partial index keeps the sweeper's scan small. [Data model and indexes](ARCHITECTURE.md#data-model-and-indexes)
-- SQS Standard with ElasticMQ locally, on Spring Boot 4.1 and Spring Cloud AWS 4.1. [Decisions and trade-offs](ARCHITECTURE.md#decisions-and-trade-offs)
+- SQS Standard because each event is an independent job, and SQS gives per-message acknowledgement, a visibility timeout and a DLQ. ElasticMQ locally because current LocalStack images need an auth token. Spring Boot 4.1 because 3.5 is out of open-source support. [Decisions and trade-offs](ARCHITECTURE.md#decisions-and-trade-offs)
 
 ## Configuration
 
-Every setting comes from an environment variable with a local default. [`.env.example`](.env.example) lists them. Docker Compose reads it if you copy it to `.env`; when running on the host, set the variables in the shell.
+Every setting except the AWS ones comes from an environment variable with a local default; [`.env.example`](.env.example) lists them all. Docker Compose reads a copy saved as `.env`, but sets the port, the MongoDB URI and the AWS values itself. When running on the host, set the variables in the shell.

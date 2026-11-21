@@ -7,21 +7,23 @@ The service takes events over REST, saves them in MongoDB and hands them to a wo
 Correctness rests on three mechanisms:
 
 1. `_id` is the `eventId`, so duplicate or concurrent `POST`s end up as one document.
-2. A worker claims an event in one atomic update and holds it on a lease. Only one worker processes an event at a time, and a crashed worker's claim expires.
+2. A worker claims an event in one atomic update and holds it on a lease. Only one worker holds the claim at a time, only the current holder can store a result, and a crashed worker's claim expires.
 3. A recovery job (the sweeper) re-publishes events that got stuck, which covers a publish that never happened and a crash mid-processing.
 
 ```mermaid
 flowchart TD
-    C[Client] -->|POST /api/events| API[REST API]
+    C[Client] -->|POST /api/events| API[EventController]
     C -->|GET| API
-    API -->|1. insert, _id = eventId| DB[(MongoDB)]
-    API -->|2. publish eventId| Q[[SQS events-queue]]
+    API --> S[EventService]
+    S -->|1. insert, _id = eventId| DB[(MongoDB)]
+    S -->|2. publish eventId| Q[[SQS events-queue]]
     Q -->|3. deliver| L[EventMessageListener]
-    L -->|4. atomic claim with lease| DB
-    L -->|5. business logic| P[EventProcessor]
-    L -->|6. conditional complete| DB
+    L --> PS[EventProcessingService]
+    PS -->|4. atomic claim with lease| DB
+    PS -->|5. business rule| P[EventProcessor]
+    PS -->|6. conditional complete or fail| DB
     Q -.->|after 5 receives| DLQ[[SQS events-dlq]]
-    R[StuckEventSweeper, every 30 s] -->|find stuck| DB
+    R[StuckEventSweeper, 30 s between runs] -->|find stuck| DB
     R -->|re-publish| Q
 ```
 
@@ -30,7 +32,7 @@ flowchart TD
 - `POST /api/events` returns `202 {"eventId", "status": "RECEIVED"}` with a `Location` header pointing to `/api/events/{eventId}`. Sending the same `eventId` with the same payload again returns `202` with the current status, so client retries are safe. The same `eventId` with a different payload returns `409`.
 - `GET /api/events/{eventId}` returns the fields from the assignment (`eventId`, `customerId`, `type`, `amount`, `currency`, `status`, `createdAt`, `processedAt`) plus `timestamp` and `failureReason`. `createdAt` is when the service received the event; `timestamp` is when it happened.
 - `GET /api/customers/{customerId}/events` filters `from`/`to` on `timestamp` (inclusive, ISO-8601), optionally by `status`, newest first (`timestamp`, then `eventId`). `page` starts at 0, `size` defaults to 20, maximum 100; a larger `size` or `from` after `to` returns `400`. The response is `{"content", "page", "size", "totalElements", "totalPages"}`. A customer with no events gets an empty page, not `404`.
-- Event types are `PAYMENT` and `REFUND`. Amounts are positive with at most 2 decimals and 15 integer digits; currency is an ISO 4217 code in upper case. `eventId` and `customerId` are 1 to 64 letters, digits, `_` or `-`. `timestamp` is stored to the millisecond. `metadata` is an optional map of strings with at most 20 entries, keys of 1 to 64 letters, digits, `_` or `-`, and values up to 256 characters; these three bounds are configurable. Currencies with 0 or 3 minor units are a simplification I accepted.
+- Event types are `PAYMENT` and `REFUND`. Amounts are positive with at most 2 decimals and 15 integer digits; currency is an ISO 4217 code in upper case. `eventId` and `customerId` are 1 to 64 letters, digits, `_` or `-`. `timestamp` is stored to the millisecond. `metadata` is an optional map of strings with at most 20 entries, keys of 1 to 64 letters, digits, `_` or `-`, and values up to 256 characters; these three bounds are configurable. I allow 2 decimals for every currency, so currencies with 0 minor units (JPY) or 3 (KWD) are not checked against their real precision.
 - The business logic is simulated and touches nothing outside MongoDB: an amount above a configurable maximum (10000.00 by default) fails permanently.
 - `GlobalExceptionHandler` returns RFC 7807 `ProblemDetail`: 400 with an `errors` list naming each failing field or query parameter (a body that isn't valid JSON gets 400 without the list), 404, 409, 503 when MongoDB doesn't answer within 5 seconds, and 500 for anything else. No response carries a stack trace or a library's exception message.
 
@@ -51,13 +53,13 @@ flowchart TD
 ## Event lifecycle
 
 ```
-RECEIVED ──claim──► PROCESSING ──success──────────────────────► PROCESSED
-    ▲                   │  │
-    │  lease expired    │  └─ permanent error, or attempts exhausted ──► FAILED
-    └──(redelivery)─────┘
+RECEIVED ──claim──► PROCESSING ──success──► PROCESSED
+                     │   ▲   │
+                     └───┘   └── permanent error, or attempts exhausted ──► FAILED
+       lease expired: claimed again, attempts + 1
 ```
 
-Retries are counted in an `attempts` field instead of extra states.
+An event never goes back to `RECEIVED`. Retries are counted in an `attempts` field instead of extra states.
 
 ## Data model and indexes
 
@@ -98,7 +100,7 @@ The customer index is ordered so it works whether or not `status` is sent. `cust
 
 The sweeper index is partial, so it only holds unfinished events and stays small however many events have been processed. Without it the sweeper would scan the whole collection every 30 seconds.
 
-As data grows, point reads and customer queries stay on indexes. Two things degrade: offset paging on deep pages (`skip` walks the index) and the `count` behind the total. The next step is keyset paging on `(occurredAt, _id)`. If sharding becomes necessary, hashed `_id` keeps the uniqueness guarantee; sharding on `customerId` keeps customer queries on one shard but loses global uniqueness of `_id`.
+As data grows, point reads and customer queries stay on indexes. Two things degrade: offset paging on deep pages (`skip` walks the index) and the `count` behind the total. The next step is keyset paging on `(occurredAt, _id)`. Events are never deleted, and the duplicate check relies on that; in production I'd archive finished events after a retention period that is longer than any client retry window. If sharding becomes necessary, hashed `_id` keeps the uniqueness guarantee; sharding on `customerId` keeps customer queries on one shard but loses global uniqueness of `_id`.
 
 ## Processing flow
 
@@ -148,7 +150,7 @@ The lease makes MongoDB state change exactly once. It can't do that for a call t
 
 Retry strategy: there are no in-process retries. SQS redelivery is the retry, with a fixed 90-second backoff (the visibility timeout); exponential backoff through `ChangeMessageVisibility` would be the next refinement. An event gets 3 attempts, tracked in MongoDB, and then becomes `FAILED`. The lease (60 s) is shorter than the visibility timeout (90 s), so a redelivered message always finds the old claim expired. `maxAttempts` (3) is lower than the queue's `maxReceiveCount` (5), so MongoDB decides when to give up and the API shows it; the DLQ only collects messages that can't be handled at all.
 
-I check both rules at startup against the real queue: the app reads the visibility timeout and the redrive policy's `maxReceiveCount` of the events queue and refuses to start if the lease isn't shorter than the visibility timeout or `maxAttempts` isn't lower than `maxReceiveCount`.
+`QueueSettingsCheck` enforces both rules at startup against the real queue: it reads the events queue's visibility timeout and redrive policy, and the app refuses to start if the queue has no redrive policy, the lease isn't shorter than the visibility timeout, or `maxAttempts` isn't lower than `maxReceiveCount`.
 
 The DLQ is a redrive policy, so no code moves messages there. In production an alarm on its depth tells an operator, who fixes the cause and then redrives the messages (`StartMessageMoveTask`) or discards them; discarding is safe for valid events because the sweeper will publish them again.
 
@@ -173,26 +175,19 @@ The API and the worker are stateless and scale horizontally from one image. `SQS
 
 The likely bottlenecks are MongoDB writes (one insert and two or three updates per event), deep pages for customers with millions of events, and the sweeper during a long backlog, when it re-publishes events that are only waiting. `lastPublishedAt`, the batch size and a `republishAfter` above normal queue latency limit that.
 
+The queue is an internal work queue: its message is a command for this service. If another service needs to react to processed events, I'd publish an "event processed" fact to SNS, or to Kafka on MSK if consumers need replay. That publish is a second write after `PROCESSED`, so it would need the same treatment as the queue publish: a "not yet published" flag and a background job that completes it.
+
 ## Testing
 
 Unit tests with Mockito cover the decisions inside a class. Everything that depends on MongoDB or SQS behaviour runs against real MongoDB 8.0 and ElasticMQ in Testcontainers: duplicate `POST`s, concurrent claims, stale tokens, index use (checked with `explain`), redelivery, the sweeper and the DLQ. The ElasticMQ test container loads the production `elasticmq.conf` unchanged, plus `fast-events-queue` with a 2-second visibility timeout and the same redrive to its own DLQ after 5 receives. Recovery tests use it with a 1-second lease, so redelivery and dead-letter cases take seconds and still pass the startup check. `./mvnw verify` fails below 80% line coverage.
 
-## Adding other consumers
-
-The SQS queue is an internal work queue: its message is a command for this service. If another service, say notifications, needs to react to processed events, the worker should publish an "event processed" fact instead of calling that service directly:
-
-- SNS with one SQS queue per subscriber, when consumers only need new events.
-- Kafka on Amazon MSK, when consumers need replay or history.
-
-Either way the publish after `PROCESSED` is a second write, so it needs the same treatment as the queue publish: a "not yet published" flag on the document and a background job that completes it. I haven't built this because nothing in the assignment needs it.
-
 ## AWS deployment
 
-ECS on Fargate with two services from one image: `api` behind an ALB and `worker` scaling on queue depth. SQS Standard with redrive to a DLQ, defined in Terraform or CDK. MongoDB Atlas over PrivateLink as a three-zone replica set (DocumentDB would need compatibility testing). The MongoDB URI comes from Secrets Manager and SQS access from the task IAM role, so there are no access keys. Both task roles also need `sqs:GetQueueUrl` and `sqs:GetQueueAttributes` for the startup check. Local credentials and the ElasticMQ endpoint come only from the local setup (Docker Compose, the test containers, or the shell when running on the host), never from the application config, so in ECS the SDK uses the task role. Tasks run in private subnets behind the ALB, which terminates TLS.
+ECS on Fargate with two services from one image: `api` behind an ALB, with `SQS_LISTENER_ENABLED=false` and `SWEEPER_ENABLED=false`, and `worker` scaling on queue depth and running the sweeper. Several sweepers are safe, so the worker needs no single-instance rule. SQS Standard with redrive to a DLQ, defined in Terraform or CDK. MongoDB Atlas over PrivateLink as a three-zone replica set (DocumentDB would need compatibility testing). The MongoDB URI comes from Secrets Manager and SQS access from the task IAM role, so there are no access keys. Both task roles also need `sqs:GetQueueUrl` and `sqs:GetQueueAttributes` for the startup check. Local credentials and the ElasticMQ endpoint come only from the local setup (Docker Compose, the test containers, or the shell when running on the host), never from the application config, so in ECS the SDK uses the task role. Tasks run in private subnets behind the ALB, which terminates TLS.
 
 ## Monitoring
 
-Implemented: JSON logs with `eventId` in the MDC on every line the service writes about a single event, so one event can be followed from `POST` to `PROCESSED`, and `/actuator/health` including MongoDB. When processing throws, the service logs the failure with `eventId` and the message stays on the queue; Spring Cloud AWS then writes its own "Error processing message" line with the stack trace, which carries only the SQS message id. A body that can't be converted to a message with an `eventId` is logged by the framework, which includes the body, and is left on the queue until it goes to the DLQ.
+Implemented: JSON logs with `eventId` in the MDC on every line the service writes while creating, processing or re-publishing an event, so one event can be followed from `POST` to `PROCESSED`, and `/actuator/health` including MongoDB. When processing throws, the service logs the failure with `eventId` and the message stays on the queue; Spring Cloud AWS then writes its own "Error processing message" line with the stack trace, which carries only the SQS message id. A body that can't be converted to a message with an `eventId` is logged by the framework, which includes the body, and is left on the queue until it goes to the DLQ.
 
 For production I'd add counters for received, duplicate, processed and failed events, a processing-time histogram and a gauge of stuck events, plus alarms on DLQ depth above zero, `ApproximateAgeOfOldestMessage`, stuck events and the 5xx rate. Tracing with OpenTelemetry, carrying the trace context in SQS message attributes, would join API and worker spans.
 

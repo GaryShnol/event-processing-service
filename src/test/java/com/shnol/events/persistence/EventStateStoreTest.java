@@ -20,8 +20,10 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import org.bson.Document;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
 
 class EventStateStoreTest extends IntegrationTest {
 
@@ -30,6 +32,9 @@ class EventStateStoreTest extends IntegrationTest {
 
 	@Autowired
 	private EventRepository repository;
+
+	@Autowired
+	private MongoTemplate mongoTemplate;
 
 	@Test
 	void receivedEventIsClaimedWithTokenLeaseAndOneAttempt() {
@@ -169,6 +174,80 @@ class EventStateStoreTest extends IntegrationTest {
 		assertThat(stateStore.fail(event.eventId(), "stale-token", "too late")).isFalse();
 
 		assertThat(repository.findById(event.eventId())).contains(reclaimed);
+	}
+
+	@Test
+	void failExhaustedMarksExpiredLeaseWithNoAttemptsLeftAsFailed() {
+		Event exhausted = insert(EventStatus.PROCESSING, 3, "token", Instant.now().minusSeconds(1));
+
+		assertThat(stateStore.failExhausted()).isPositive();
+
+		Event stored = repository.findById(exhausted.eventId()).orElseThrow();
+		assertThat(stored.status()).isEqualTo(EventStatus.FAILED);
+		assertThat(stored.failureReason()).isEqualTo("max attempts exceeded");
+		assertThat(stored.updatedAt()).isAfter(exhausted.updatedAt());
+		assertThat(stored.processedAt()).isNull();
+	}
+
+	@Test
+	void failExhaustedLeavesAHeldLeaseOnTheLastAttemptUntouched() {
+		Event lastAttempt = insert(EventStatus.PROCESSING, 3, "token", Instant.now().plusSeconds(30));
+
+		stateStore.failExhausted();
+
+		assertThat(repository.findById(lastAttempt.eventId())).contains(lastAttempt);
+	}
+
+	@Test
+	void failExhaustedLeavesEventsWithAttemptsLeftOrNotProcessingUntouched() {
+		Event attemptsLeft = insert(EventStatus.PROCESSING, 2, "token", Instant.now().minusSeconds(1));
+		Event received = insert(EventStatus.RECEIVED, 0, null, null);
+		Event processed = insert(EventStatus.PROCESSED, 3, "token", Instant.now().minusSeconds(1));
+
+		stateStore.failExhausted();
+
+		assertThat(repository.findById(attemptsLeft.eventId())).contains(attemptsLeft);
+		assertThat(repository.findById(received.eventId())).contains(received);
+		assertThat(repository.findById(processed.eventId())).contains(processed);
+	}
+
+	@Test
+	void markRepublishedMovesLastPublishedAtForward() {
+		Event event = insert(EventStatus.RECEIVED, 0, null, null);
+		Instant before = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+
+		stateStore.markRepublished(event.eventId(), event.lastPublishedAt());
+
+		assertThat(repository.findById(event.eventId()).orElseThrow().lastPublishedAt()).isAfterOrEqualTo(before);
+	}
+
+	@Test
+	void markRepublishedDoesNothingWhenAnotherSweeperRecordedAPublishSinceTheRead() {
+		Event event = insert(EventStatus.RECEIVED, 0, null, null);
+		stateStore.markRepublished(event.eventId(), event.lastPublishedAt());
+		Event afterFirst = repository.findById(event.eventId()).orElseThrow();
+
+		stateStore.markRepublished(event.eventId(), event.lastPublishedAt());
+
+		assertThat(repository.findById(event.eventId())).contains(afterFirst);
+	}
+
+	@Test
+	void markRepublishedLeavesAFinishedEventUntouched() {
+		Event processed = insert(EventStatus.PROCESSED, 1, "token", Instant.now().minusSeconds(1));
+
+		stateStore.markRepublished(processed.eventId(), processed.lastPublishedAt());
+
+		assertThat(repository.findById(processed.eventId())).contains(processed);
+	}
+
+	@Test
+	void exhaustedQueryUsesTheSweeperIndex() {
+		Document plan = mongoTemplate.getCollection("events")
+				.find(EventStateStore.exhaustedQuery(Instant.now(), 3).getQueryObject()).explain();
+
+		assertThat(plan.get("queryPlanner", Document.class).get("winningPlan", Document.class).toJson())
+				.contains("\"indexName\": \"" + IndexInitializer.SWEEPER_INDEX + "\"");
 	}
 
 	private Event insert(EventStatus status, int attempts, String claimToken, Instant lockedUntil) {

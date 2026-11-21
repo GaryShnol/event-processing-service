@@ -18,6 +18,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class EventStateStore {
 
+	public static final String MAX_ATTEMPTS_EXCEEDED = "max attempts exceeded";
+
 	private final MongoTemplate mongoTemplate;
 	private final Clock clock;
 	private final EventsProperties properties;
@@ -64,6 +66,35 @@ public class EventStateStore {
 				.set("status", EventStatus.FAILED)
 				.set("failureReason", reason)
 				.set("updatedAt", clock.instant()));
+	}
+
+	/**
+	 * Marks every PROCESSING event whose lease has expired and that has no attempts left as FAILED, in one
+	 * update. A lease that is still held is never matched, so a worker on its last attempt can finish.
+	 */
+	public long failExhausted() {
+		Instant now = clock.instant();
+		return mongoTemplate.updateMulti(exhaustedQuery(now, properties.maxAttempts()), new Update()
+				.set("status", EventStatus.FAILED)
+				.set("failureReason", MAX_ATTEMPTS_EXCEEDED)
+				.set("updatedAt", now), Event.class).getModifiedCount();
+	}
+
+	static Query exhaustedQuery(Instant now, int maxAttempts) {
+		return Query.query(Criteria.where("status").is(EventStatus.PROCESSING)
+				.and("lockedUntil").lt(now)
+				.and("attempts").gte(maxAttempts));
+	}
+
+	/**
+	 * Records a re-publish, unless the event has finished or another sweeper has recorded one since
+	 * previousPublishedAt was read.
+	 */
+	public void markRepublished(String eventId, Instant previousPublishedAt) {
+		Query query = Query.query(Criteria.where("_id").is(eventId)
+				.and("status").in(EventStatus.RECEIVED, EventStatus.PROCESSING)
+				.and("lastPublishedAt").is(previousPublishedAt));
+		mongoTemplate.updateFirst(query, new Update().set("lastPublishedAt", clock.instant()), Event.class);
 	}
 
 	private boolean finish(String eventId, String claimToken, Update update) {

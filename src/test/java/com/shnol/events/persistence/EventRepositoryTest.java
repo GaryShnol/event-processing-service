@@ -124,6 +124,52 @@ class EventRepositoryTest extends IntegrationTest {
 		assertThat(plan).contains("\"indexName\": \"" + IndexInitializer.CUSTOMER_INDEX + "\"").doesNotContain("\"SORT\"");
 	}
 
+	@Test
+	void findStuckReturnsReceivedAndExpiredProcessingEventsPublishedBeforeTheCutoff() {
+		Instant now = Instant.parse("2026-09-10T12:00:00Z");
+		Instant cutoff = now.minusSeconds(120);
+		Event received = stored(EventStatus.RECEIVED, null, cutoff.minusSeconds(1));
+		Event expired = stored(EventStatus.PROCESSING, now.minusSeconds(1), cutoff.minusSeconds(1));
+		Event recentlyPublished = stored(EventStatus.RECEIVED, null, cutoff.plusSeconds(1));
+		Event leaseHeld = stored(EventStatus.PROCESSING, now.plusSeconds(30), cutoff.minusSeconds(1));
+		Event processed = stored(EventStatus.PROCESSED, now.minusSeconds(1), cutoff.minusSeconds(1));
+		Event failed = stored(EventStatus.FAILED, now.minusSeconds(1), cutoff.minusSeconds(1));
+
+		assertThat(repository.findStuck(now, cutoff, 10_000)).extracting(Event::eventId)
+				.contains(received.eventId(), expired.eventId())
+				.doesNotContain(recentlyPublished.eventId(), leaseHeld.eventId(), processed.eventId(), failed.eventId());
+	}
+
+	@Test
+	void findStuckReturnsAtMostTheBatchSize() {
+		Instant now = Instant.parse("2026-09-10T12:00:00Z");
+		for (int i = 0; i < 3; i++) {
+			stored(EventStatus.RECEIVED, null, now.minusSeconds(600));
+		}
+
+		assertThat(repository.findStuck(now, now.minusSeconds(120), 2)).hasSize(2);
+	}
+
+	@Test
+	void stuckQueryUsesTheSweeperIndex() {
+		Instant now = Instant.parse("2026-09-10T12:00:00Z");
+		Query query = EventRepository.stuckQuery(now, now.minusSeconds(120)).limit(100);
+
+		Document plan = mongoTemplate.getCollection("events").find(query.getQueryObject()).limit(query.getLimit()).explain();
+
+		assertThat(plan.get("queryPlanner", Document.class).get("winningPlan", Document.class).toJson())
+				.contains("\"indexName\": \"" + IndexInitializer.SWEEPER_INDEX + "\"");
+	}
+
+	private Event stored(EventStatus status, Instant lockedUntil, Instant lastPublishedAt) {
+		Event e = event(customer(), DAY_1, "1");
+		Event event = new Event(e.eventId(), e.customerId(), e.type(), e.amount(), e.currency(), e.occurredAt(),
+				e.metadata(), e.payloadHash(), status, 1, null, lockedUntil, lastPublishedAt, null, e.createdAt(),
+				e.createdAt(), null);
+		repository.insert(event);
+		return event;
+	}
+
 	private String explain(Query customerQuery) {
 		Query query = EventRepository.pagedQuery(customerQuery, PageRequest.of(1, 20));
 		Document plan = mongoTemplate.getCollection("events").find(query.getQueryObject())

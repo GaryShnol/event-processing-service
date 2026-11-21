@@ -1,0 +1,8 @@
+{
+  "eventId": "evt-1001",
+  "customerId": "customer-42",
+  "type": "PAYMENT",
+  "amount": 99.99,
+  "currency": "ILS",
+  "timestamp": "2026-11-01T10:15:00Z"
+}

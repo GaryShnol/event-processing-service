@@ -55,8 +55,8 @@ Never push, never merge to `main`, never use `--no-verify`. When an AI suggestio
 
 ### 1. `feature/project-setup`
 Project with the stack above, config properties record, `elasticmq.conf` (`events-queue` with 90 s visibility and DLQ `events-dlq` at `maxReceiveCount = 5`), `docker-compose.yml` with pinned images and health checks, multi-stage non-root `Dockerfile`, `.env.example`, Testcontainers base class, JSON logging.
-- [ ] `./mvnw verify` green with a context test against the containers
-- [ ] `docker compose up --build`: `/actuator/health` is `UP` and both queues exist
+- [x] `./mvnw verify` green with a context test against the containers
+- [x] `docker compose up --build`: `/actuator/health` is `UP` and both queues exist
 
 ### 2. `feature/events-api`
 `Event`, enums, repository, `IndexInitializer` (the indexes in `ARCHITECTURE.md`), DTOs with validation, `EventService.create` with duplicate handling, both GET endpoints, `GlobalExceptionHandler`. `EventPublisher` is an interface with a no-op implementation for now.

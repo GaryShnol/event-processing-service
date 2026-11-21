@@ -16,13 +16,13 @@ A Spring Boot service that accepts business events over REST, stores them in Mon
 
 - `./mvnw verify` (Windows: `mvnw.cmd verify`): build, all tests, coverage check (80% lines). Docker must be running.
 - `docker compose up --build`: MongoDB, ElasticMQ and the app on http://localhost:8080.
-- `docker compose up mongo elasticmq` and `./mvnw spring-boot:run`: app on the host, dependencies in Docker.
+- `docker compose up -d mongo elasticmq`, then in PowerShell `$env:AWS_REGION="us-east-1"; $env:AWS_ACCESS_KEY_ID="local"; $env:AWS_SECRET_ACCESS_KEY="local"; $env:AWS_ENDPOINT_URL_SQS="http://localhost:9324"` and `.\mvnw.cmd spring-boot:run`: app on the host, dependencies in Docker.
 
 ## Code rules
 
 1. Keep it simple. Comments only for the reason behind a non-obvious decision. Catch an exception only where you handle it specifically.
 2. Packages: `api`, `application`, `domain`, `persistence`, `messaging`, `recovery`, `config`. `domain` depends on nothing in the app.
-3. MongoDB only through `EventRepository` (reads, insert) and `EventStateStore` (atomic transitions). SQS only through `EventPublisher` and `EventMessageListener`.
+3. MongoDB only through `EventRepository` (reads, insert) and `EventStateStore` (atomic transitions). SQS only through `EventPublisher`, `EventMessageListener` and `QueueSettingsCheck` (startup check of queue settings).
 4. Every correctness-critical state change is one atomic, conditional MongoDB operation. Never read-then-write. Duplicates are detected by `DuplicateKeyException`, never check-then-insert.
 5. Acknowledge a message only after the final state is stored, or when no work is needed.
 6. Money is `BigDecimal`. Times are `Instant` from an injected `Clock`. Statuses are the enum. Limits, timeouts and queue names live in one `@ConfigurationProperties` record.

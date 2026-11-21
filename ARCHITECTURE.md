@@ -141,6 +141,8 @@ The lease makes MongoDB state change exactly once. It can't do that for a call t
 
 Retry strategy: there are no in-process retries. SQS redelivery is the retry, with a fixed 90-second backoff (the visibility timeout); exponential backoff through `ChangeMessageVisibility` would be the next refinement. An event gets 3 attempts, tracked in MongoDB, and then becomes `FAILED`. The lease (60 s) is shorter than the visibility timeout (90 s), so a redelivered message always finds the old claim expired. `maxAttempts` (3) is lower than the queue's `maxReceiveCount` (5), so MongoDB decides when to give up and the API shows it; the DLQ only collects messages that can't be handled at all.
 
+I check both rules at startup against the real queue: the app reads the visibility timeout and the redrive policy's `maxReceiveCount` of the events queue and refuses to start if the lease isn't shorter than the visibility timeout or `maxAttempts` isn't lower than `maxReceiveCount`.
+
 The DLQ is a redrive policy, so no code moves messages there. Messages in it trigger an alarm. After fixing the cause, the operator redrives them (`StartMessageMoveTask`) or discards them; discarding is safe for valid events because the sweeper will publish them again.
 
 ## Decisions and trade-offs
@@ -174,7 +176,7 @@ Either way the publish after `PROCESSED` is a second write, so it needs the same
 
 ## AWS deployment
 
-ECS on Fargate with two services from one image: `api` behind an ALB and `worker` scaling on queue depth. SQS Standard with redrive to a DLQ, defined in Terraform or CDK. MongoDB Atlas over PrivateLink as a three-zone replica set (DocumentDB would need compatibility testing). The MongoDB URI comes from Secrets Manager and SQS access from the task IAM role, so there are no access keys. Tasks run in private subnets behind the ALB, which terminates TLS.
+ECS on Fargate with two services from one image: `api` behind an ALB and `worker` scaling on queue depth. SQS Standard with redrive to a DLQ, defined in Terraform or CDK. MongoDB Atlas over PrivateLink as a three-zone replica set (DocumentDB would need compatibility testing). The MongoDB URI comes from Secrets Manager and SQS access from the task IAM role, so there are no access keys. Both task roles also need `sqs:GetQueueUrl` and `sqs:GetQueueAttributes` for the startup check. Local credentials and the ElasticMQ endpoint come only from the local setup (Docker Compose, the test containers, or the shell when running on the host), never from the application config, so in ECS the SDK uses the task role. Tasks run in private subnets behind the ALB, which terminates TLS.
 
 ## Monitoring
 

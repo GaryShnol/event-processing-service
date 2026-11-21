@@ -108,7 +108,7 @@ HTTP/1.1 409
 {"detail":"Event evt-1001 already exists with a different payload","instance":"/api/events","status":409,"title":"Conflict"}
 ```
 
-An invalid request names each failing field:
+An invalid request names each failing field. The order of the errors can vary:
 
 ```
 curl -s -i -X POST http://localhost:8080/api/events -H "Content-Type: application/json" --data-binary "@examples/invalid.json"
@@ -124,11 +124,17 @@ An amount above the maximum (10000.00 by default) is accepted and then fails in 
 
 ```
 curl -s -X POST http://localhost:8080/api/events -H "Content-Type: application/json" --data-binary "@examples/large-payment.json"
-curl -s http://localhost:8080/api/events/evt-1002
 ```
 
 ```
 {"eventId":"evt-1002","status":"RECEIVED"}
+```
+
+```
+curl -s http://localhost:8080/api/events/evt-1002
+```
+
+```
 {"eventId":"evt-1002","customerId":"customer-42","type":"PAYMENT","amount":25000.00,"currency":"ILS","status":"FAILED","timestamp":"2026-11-02T09:00:00Z","createdAt":"2026-11-21T20:56:37.719Z","processedAt":null,"failureReason":"amount 25000.00 exceeds the maximum of 10000.00"}
 ```
 
@@ -181,4 +187,4 @@ An event is stored as `RECEIVED` and its `eventId` is put on the queue. A worker
 
 ## Configuration
 
-Every setting comes from an environment variable with a local default. [`.env.example`](.env.example) lists them. Docker Compose reads a `.env` file if you copy it there; on the host, set the variables in the shell.
+Every setting comes from an environment variable with a local default. [`.env.example`](.env.example) lists them. Docker Compose reads it if you copy it to `.env`; when running on the host, set the variables in the shell.

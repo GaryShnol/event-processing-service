@@ -1,0 +1,28 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: event-processing-service
+  mongodb:
+    uri: ${MONGODB_URI:mongodb://localhost:27017/events}
+
+events:
+  queues:
+    events: ${EVENTS_QUEUE:events-queue}
+    dead-letter: ${EVENTS_DLQ:events-dlq}
+  lease: ${PROCESSING_LEASE:60s}
+  max-attempts: ${PROCESSING_MAX_ATTEMPTS:3}
+  max-amount: ${MAX_AMOUNT:10000.00}
+  sweeper:
+    interval: ${SWEEPER_INTERVAL:30s}
+    republish-after: ${SWEEPER_REPUBLISH_AFTER:2m}
+    batch-size: ${SWEEPER_BATCH_SIZE:100}
+  paging:
+    default-size: ${PAGE_DEFAULT_SIZE:20}
+    max-size: ${PAGE_MAX_SIZE:100}
+
+logging:
+  structured:
+    format:
+      console: ${LOG_FORMAT:ecs}

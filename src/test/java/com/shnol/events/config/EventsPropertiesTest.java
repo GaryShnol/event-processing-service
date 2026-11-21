@@ -23,7 +23,10 @@ class EventsPropertiesTest {
 					"events.sweeper.republish-after=2m",
 					"events.sweeper.batch-size=100",
 					"events.paging.default-size=20",
-					"events.paging.max-size=100");
+					"events.paging.max-size=100",
+					"events.metadata.max-entries=20",
+					"events.metadata.max-key-length=64",
+					"events.metadata.max-value-length=256");
 
 	@Test
 	void bindsValidProperties() {
@@ -58,6 +61,11 @@ class EventsPropertiesTest {
 	@Test
 	void rejectsDefaultPageSizeAboveMaximum() {
 		assertRejected("events.paging.default-size=101", "paging.defaultSizeWithinMax");
+	}
+
+	@Test
+	void rejectsZeroMetadataEntries() {
+		assertRejected("events.metadata.max-entries=0", "metadata.maxEntries");
 	}
 
 	private void assertRejected(String property, String field) {

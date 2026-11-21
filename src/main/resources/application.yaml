@@ -5,7 +5,7 @@ spring:
   application:
     name: event-processing-service
   mongodb:
-    uri: ${MONGODB_URI:mongodb://localhost:27017/events}
+    uri: ${MONGODB_URI:mongodb://localhost:27017/events?serverSelectionTimeoutMS=5000}
 
 events:
   queues:
@@ -21,6 +21,10 @@ events:
   paging:
     default-size: ${PAGE_DEFAULT_SIZE:20}
     max-size: ${PAGE_MAX_SIZE:100}
+  metadata:
+    max-entries: ${METADATA_MAX_ENTRIES:20}
+    max-key-length: ${METADATA_MAX_KEY_LENGTH:64}
+    max-value-length: ${METADATA_MAX_VALUE_LENGTH:256}
 
 logging:
   structured:

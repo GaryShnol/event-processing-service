@@ -109,11 +109,13 @@ Process:
 1. Claim with one `findAndModify`: match `_id` where the status is `RECEIVED`, or `PROCESSING` with an expired lease, and `attempts < maxAttempts`. Set `PROCESSING`, a new `claimToken`, `lockedUntil = now + 60 s`, and increment `attempts`.
 2. No match means the event is done, owned by another worker, or out of attempts: acknowledge and stop.
 3. Run the business logic, then complete with a conditional update on `status = PROCESSING` and my `claimToken`. If it matches nothing, my lease expired and another worker owns the event.
-4. A permanent business error sets `FAILED` the same way. Any other exception is not caught, so the message is not acknowledged and SQS redelivers it.
+4. A permanent business error sets `FAILED` the same way. Any other exception is not caught: the listener's error handler logs it with `eventId` and rethrows, so the message is not acknowledged and SQS redelivers it.
 
-Recover (sweeper, every 30 s, using `@Scheduled`):
-1. Mark `PROCESSING` events with an expired lease and no attempts left as `FAILED`.
-2. Re-publish `RECEIVED` events, and `PROCESSING` events with an expired lease, whose `lastPublishedAt` is older than 2 minutes. Batched, and `lastPublishedAt` is updated so the same event isn't re-sent every run.
+Recover (sweeper, every 30 s, using `@Scheduled`; `SWEEPER_ENABLED=false` turns it off on an instance):
+1. Mark `PROCESSING` events with an expired lease and no attempts left as `FAILED` with "max attempts exceeded", in one `updateMany`. A lease that is still held is never matched.
+2. Re-publish up to 100 `RECEIVED` events, and `PROCESSING` events with an expired lease, whose `lastPublishedAt` is older than 2 minutes. After each publish, a conditional update sets `lastPublishedAt` to now unless another sweeper already did, so the same event isn't re-sent every run. A publish failure ends the run and the next run continues.
+
+Each run logs how many events it failed and re-published. Interval, age and batch size are configurable.
 
 ## Idempotency
 
@@ -131,13 +133,14 @@ The lease makes MongoDB state change exactly once. It can't do that for a call t
 | Scenario | Behaviour |
 | --- | --- |
 | Permanent business error | `FAILED` with a reason, no retry |
-| Transient error in processing | Not acknowledged, redelivered after the visibility timeout |
+| Transient error in processing | Logged with `eventId`, not acknowledged, redelivered after the visibility timeout |
+| Attempts exhausted | Once the last lease expires, the sweeper marks the event `FAILED` with "max attempts exceeded" |
 | MongoDB down during `POST` | `503`; the client retries; nothing is half-written |
 | MongoDB down during processing | Redelivered; after 5 receives the message goes to the DLQ, but MongoDB still shows the event unfinished, so the sweeper re-publishes it when MongoDB is back |
-| Publish fails after insert | `202`; the sweeper publishes it |
+| Publish fails after insert | Logged at WARN, `202`; the sweeper publishes it once `lastPublishedAt` is older than 2 minutes |
 | Duplicate delivery | Claim matches nothing; acknowledged |
 | Crash mid-processing | Message redelivered and lease expires, so another worker claims it; if the message is gone, the sweeper re-publishes |
-| Poison message | DLQ after 5 receives |
+| Poison message (not JSON, or no `eventId`) | Not acknowledged; DLQ after 5 receives |
 
 Retry strategy: there are no in-process retries. SQS redelivery is the retry, with a fixed 90-second backoff (the visibility timeout); exponential backoff through `ChangeMessageVisibility` would be the next refinement. An event gets 3 attempts, tracked in MongoDB, and then becomes `FAILED`. The lease (60 s) is shorter than the visibility timeout (90 s), so a redelivered message always finds the old claim expired. `maxAttempts` (3) is lower than the queue's `maxReceiveCount` (5), so MongoDB decides when to give up and the API shows it; the DLQ only collects messages that can't be handled at all.
 

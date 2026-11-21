@@ -82,6 +82,6 @@ Transient exceptions propagate (no ack), `StuckEventSweeper` (fail exhausted, re
 
 ### 5. `docs/final-documentation`
 `README.md` (both ways to run, how to test, a curl for every endpoint, key decisions in a few lines linking to `ARCHITECTURE.md`). Update `ARCHITECTURE.md` to match the code. Finish `AI_USAGE.md`. Plain, concise prose, first person for decisions, no filler.
-- [ ] Fresh clone: `docker compose up --build` and every README curl works as written
-- [ ] Fresh clone: `./mvnw verify` green
-- [ ] A fresh reviewer finds no claim in the docs that the code doesn't back
+- [x] Fresh clone: `docker compose up --build` and every README curl works as written
+- [x] Fresh clone: `./mvnw verify` green
+- [x] A fresh reviewer finds no claim in the docs that the code doesn't back

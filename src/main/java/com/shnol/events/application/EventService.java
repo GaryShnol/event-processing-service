@@ -10,7 +10,6 @@ import java.time.Clock;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -39,17 +38,15 @@ public class EventService {
 	 */
 	public EventStatus create(NewEvent newEvent) {
 		Event event = Event.received(newEvent, clock.instant());
-		try (var ignored = MDC.putCloseable("eventId", event.eventId())) {
-			try {
-				repository.insert(event);
-			}
-			catch (DuplicateKeyException e) {
-				return existingStatus(event);
-			}
-			log.info("Event received");
-			publisher.publish(event.eventId());
-			return event.status();
+		try {
+			repository.insert(event);
 		}
+		catch (DuplicateKeyException e) {
+			return existingStatus(event);
+		}
+		log.info("Event received");
+		publisher.publish(event.eventId());
+		return event.status();
 	}
 
 	public Event get(String eventId) {

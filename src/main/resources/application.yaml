@@ -6,6 +6,12 @@ spring:
     name: event-processing-service
   mongodb:
     uri: ${MONGODB_URI:mongodb://localhost:27017/events?serverSelectionTimeoutMS=5000}
+  cloud:
+    aws:
+      sqs:
+        listener:
+          # false for an API-only deployment: events are still published, but this instance doesn't consume them.
+          auto-startup: ${SQS_LISTENER_ENABLED:true}
 
 events:
   queues:

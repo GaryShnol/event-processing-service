@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import java.net.URI;
 import java.time.Instant;
+import org.slf4j.MDC;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,6 +30,8 @@ class EventController {
 
 	@PostMapping("/events")
 	ResponseEntity<CreateEventResponse> create(@Valid @RequestBody CreateEventRequest request) {
+		// Not closed here: the exception handlers log after this method has thrown. EventIdMdcFilter removes it.
+		MDC.put(EventIdMdcFilter.KEY, request.eventId());
 		EventStatus status = service.create(request.toNewEvent());
 		URI location = UriComponentsBuilder.fromPath("/api/events/{eventId}").buildAndExpand(request.eventId()).toUri();
 		return ResponseEntity.accepted().location(location).body(new CreateEventResponse(request.eventId(), status));

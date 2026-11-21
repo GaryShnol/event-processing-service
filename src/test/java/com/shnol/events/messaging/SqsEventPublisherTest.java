@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.shnol.events.IntegrationTest;
 import com.shnol.events.config.EventsProperties;
+import io.awspring.cloud.sqs.listener.MessageListenerContainer;
+import io.awspring.cloud.sqs.listener.MessageListenerContainerRegistry;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -12,7 +14,7 @@ import org.springframework.test.context.TestPropertySource;
 import software.amazon.awssdk.services.sqs.SqsAsyncClient;
 import software.amazon.awssdk.services.sqs.model.Message;
 
-// The listener is off so the test can read the message off the queue itself.
+// An API-only deployment: the listener is off, so the test can read the published message off the queue itself.
 @TestPropertySource(properties = "spring.cloud.aws.sqs.listener.auto-startup=false")
 class SqsEventPublisherTest extends IntegrationTest {
 
@@ -25,6 +27,9 @@ class SqsEventPublisherTest extends IntegrationTest {
 	@Autowired
 	private EventsProperties properties;
 
+	@Autowired
+	private MessageListenerContainerRegistry listenerContainers;
+
 	@Test
 	void publishSendsOnlyTheEventIdAsJsonToTheEventsQueue() {
 		String eventId = "evt-" + UUID.randomUUID();
@@ -32,6 +37,12 @@ class SqsEventPublisherTest extends IntegrationTest {
 		publisher.publish(eventId);
 
 		assertThat(receiveAll()).extracting(Message::body).contains("{\"eventId\":\"%s\"}".formatted(eventId));
+	}
+
+	@Test
+	void listenerDoesNotConsumeWhenAutoStartupIsOff() {
+		assertThat(listenerContainers.getListenerContainers()).isNotEmpty()
+				.noneMatch(MessageListenerContainer::isRunning);
 	}
 
 	private List<Message> receiveAll() {

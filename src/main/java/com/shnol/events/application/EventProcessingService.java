@@ -41,7 +41,8 @@ public class EventProcessingService {
 		}
 		catch (PermanentProcessingException e) {
 			if (stateStore.fail(eventId, event.claimToken(), e.getMessage())) {
-				log.info("Event failed: {}", e.getMessage());
+				// The reason quotes the amount, so it goes on the document only, not in the log.
+				log.info("Event failed permanently");
 			}
 			else {
 				logLostClaim();

@@ -65,7 +65,7 @@ class EventMessageListenerTest extends IntegrationTest {
 	private EventStateStore stateStore;
 
 	@Test
-	void postedEventIsEventuallyProcessedWithEventIdOnEveryLogLine(CapturedOutput output) {
+	void postedEventIsEventuallyProcessedAndEachTransitionIsLoggedWithEventId(CapturedOutput output) {
 		String eventId = eventId();
 		post(eventId, "1250.50");
 

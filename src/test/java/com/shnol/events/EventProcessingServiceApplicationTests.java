@@ -7,12 +7,17 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.health.actuate.endpoint.HealthEndpoint;
 import org.springframework.boot.health.contributor.Status;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import software.amazon.awssdk.services.sqs.SqsAsyncClient;
 import software.amazon.awssdk.services.sqs.model.QueueAttributeName;
 
+@ExtendWith(OutputCaptureExtension.class)
 class EventProcessingServiceApplicationTests extends IntegrationTest {
 
 	@Autowired
@@ -53,6 +58,14 @@ class EventProcessingServiceApplicationTests extends IntegrationTest {
 		assertThat(properties.sweeper().batchSize()).isEqualTo(100);
 		assertThat(properties.paging().defaultSize()).isEqualTo(20);
 		assertThat(properties.paging().maxSize()).isEqualTo(100);
+	}
+
+	@Test
+	void logsAsStructuredJson(CapturedOutput output) {
+		LoggerFactory.getLogger(getClass()).info("structured logging check");
+
+		assertThat(output.getOut()).containsPattern(
+				"\\{\"@timestamp\":\"[^\"]+\".*\"message\":\"structured logging check\"");
 	}
 
 	private Map<QueueAttributeName, String> attributes(String queueName) {

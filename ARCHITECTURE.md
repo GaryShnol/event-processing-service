@@ -107,12 +107,12 @@ As data grows, point reads and customer queries stay on indexes. Two things degr
 Create:
 1. Validate the request and `insert` it with `status = RECEIVED`.
 2. On `DuplicateKeyException`, compare `payloadHash`: same returns the current status, different returns `409`. No check-then-insert, so concurrent duplicates are decided by the unique index.
-3. Publish `{eventId}` to SQS and return `202`. If the publish fails, I log it and still return `202`; the sweeper publishes it later.
+3. Publish `{eventId}` to SQS and return `202`. If the publish fails, the service logs it and still returns `202`; the sweeper publishes it later.
 
 Process:
 1. Claim with one `findAndModify`: match `_id` where the status is `RECEIVED`, or `PROCESSING` with an expired lease, and `attempts < maxAttempts`. Set `PROCESSING`, a new `claimToken`, `lockedUntil = now + 60 s`, and increment `attempts`.
 2. No match means the event is done, owned by another worker, or out of attempts: acknowledge and stop.
-3. Run the business logic, then complete with a conditional update on `status = PROCESSING` and my `claimToken`. If it matches nothing, my lease expired and another worker owns the event.
+3. Run the business logic, then complete with a conditional update on `status = PROCESSING` and the worker's `claimToken`. If it matches nothing, the worker's lease expired and another worker owns the event.
 4. A permanent business error sets `FAILED` the same way. Any other exception is not caught: the listener's error handler logs it with `eventId` and rethrows, so the message is not acknowledged and SQS redelivers it.
 
 Recover (`StuckEventSweeper`, `@Scheduled` with 30 s between runs; `SWEEPER_ENABLED=false` turns it off on an instance):

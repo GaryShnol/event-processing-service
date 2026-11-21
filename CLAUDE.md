@@ -67,10 +67,10 @@ Project with the stack above, config properties record, `elasticmq.conf` (`event
 
 ### 3. `feature/async-processing`
 `SqsEventPublisher`, `EventStateStore` (`claim`, `complete`, `fail`), `EventProcessor`, `EventProcessingService`, `EventMessageListener`, `eventId` in the MDC.
-- [ ] POST, then GET eventually shows `PROCESSED` with `processedAt`
-- [ ] The same message delivered twice concurrently runs the processor once
-- [ ] Amount above the maximum ends `FAILED` with a reason
-- [ ] On real MongoDB: a finished event can't be claimed, an expired lease can, a stale `claimToken` can't complete
+- [x] POST, then GET eventually shows `PROCESSED` with `processedAt`
+- [x] The same message delivered twice concurrently runs the processor once
+- [x] Amount above the maximum ends `FAILED` with a reason
+- [x] On real MongoDB: a finished event can't be claimed, an expired lease can, a stale `claimToken` can't complete
 
 ### 4. `feature/failure-recovery`
 Transient exceptions propagate (no ack), `StuckEventSweeper` (fail exhausted, re-publish stuck, batched, can be disabled), publish failure in create is logged and the request still returns `202`.

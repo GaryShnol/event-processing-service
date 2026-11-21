@@ -20,7 +20,8 @@ public record EventsProperties(
 		@Min(1) int maxAttempts,
 		@NotNull @Positive BigDecimal maxAmount,
 		@Valid @NotNull Sweeper sweeper,
-		@Valid @NotNull Paging paging) {
+		@Valid @NotNull Paging paging,
+		@Valid @NotNull Metadata metadata) {
 
 	public record Queues(@NotBlank String events, @NotBlank String deadLetter) {
 	}
@@ -37,5 +38,8 @@ public record EventsProperties(
 		public boolean isDefaultSizeWithinMax() {
 			return defaultSize <= maxSize;
 		}
+	}
+
+	public record Metadata(@Min(1) int maxEntries, @Min(1) int maxKeyLength, @Min(1) int maxValueLength) {
 	}
 }

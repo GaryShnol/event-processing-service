@@ -51,7 +51,7 @@ class EventServiceTest {
 		EventsProperties properties = new EventsProperties(new EventsProperties.Queues("events-queue", "events-dlq"),
 				Duration.ofSeconds(60), 3, new BigDecimal("10000.00"),
 				new EventsProperties.Sweeper(Duration.ofSeconds(30), Duration.ofMinutes(2), 100),
-				new EventsProperties.Paging(20, 100));
+				new EventsProperties.Paging(20, 100), new EventsProperties.Metadata(20, 64, 256));
 		return new EventService(repository, publisher, Clock.fixed(NOW, ZoneOffset.UTC), properties);
 	}
 

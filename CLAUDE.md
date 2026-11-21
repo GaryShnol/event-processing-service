@@ -60,10 +60,10 @@ Project with the stack above, config properties record, `elasticmq.conf` (`event
 
 ### 2. `feature/events-api`
 `Event`, enums, repository, `IndexInitializer` (the indexes in `ARCHITECTURE.md`), DTOs with validation, `EventService.create` with duplicate handling, both GET endpoints, `GlobalExceptionHandler`. `EventPublisher` is an interface with a no-op implementation for now.
-- [ ] 20 concurrent POSTs with one `eventId`: one document, all `202`, one publish
-- [ ] Same `eventId` and payload returns `202` with current status; different payload returns `409`
-- [ ] Indexes exist with the specified keys and partial filter
-- [ ] Customer query filters by date range and status, pages newest first, rejects `size > 100` and `from > to`
+- [x] 20 concurrent POSTs with one `eventId`: one document, all `202`, one publish
+- [x] Same `eventId` and payload returns `202` with current status; different payload returns `409`
+- [x] Indexes exist with the specified keys and partial filter
+- [x] Customer query filters by date range and status, pages newest first, rejects `size > 100` and `from > to`
 
 ### 3. `feature/async-processing`
 `SqsEventPublisher`, `EventStateStore` (`claim`, `complete`, `fail`), `EventProcessor`, `EventProcessingService`, `EventMessageListener`, `eventId` in the MDC.

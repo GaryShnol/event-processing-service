@@ -29,12 +29,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({ MockitoExtension.class, OutputCaptureExtension.class })
 class EventServiceTest {
 
 	private static final Instant NOW = Instant.parse("2026-09-13T20:15:01Z");
@@ -66,6 +68,16 @@ class EventServiceTest {
 		assertThat(inserted.getValue().lastPublishedAt()).isEqualTo(NOW);
 		verify(publisher).publish("evt-1");
 		assertThat(status).isEqualTo(EventStatus.RECEIVED);
+	}
+
+	@Test
+	void publishFailureAfterInsertIsLoggedAndStillReturnsReceived(CapturedOutput output) {
+		doThrow(new IllegalStateException("SQS unavailable")).when(publisher).publish("evt-1");
+
+		assertThat(service().create(newEvent("1250.50"))).isEqualTo(EventStatus.RECEIVED);
+
+		verify(repository).insert(any());
+		assertThat(output.getOut()).contains("Publish failed, the sweeper will publish the event later");
 	}
 
 	@Test

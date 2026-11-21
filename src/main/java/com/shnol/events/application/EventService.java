@@ -45,7 +45,14 @@ public class EventService {
 			return existingStatus(event);
 		}
 		log.info("Event received");
-		publisher.publish(event.eventId());
+		try {
+			publisher.publish(event.eventId());
+		}
+		catch (RuntimeException e) {
+			// Whatever the transport throws, the event is stored and the sweeper publishes it later, so the
+			// client gets 202 rather than retrying an event that already exists.
+			log.warn("Publish failed, the sweeper will publish the event later", e);
+		}
 		return event.status();
 	}
 

@@ -180,7 +180,7 @@ ECS on Fargate with two services from one image: `api` behind an ALB and `worker
 
 ## Monitoring
 
-Implemented: JSON logs with `eventId` in the MDC on every line, so one event can be followed from `POST` to `PROCESSED`, and `/actuator/health` including MongoDB.
+Implemented: JSON logs with `eventId` in the MDC on every line the service writes, so one event can be followed from `POST` to `PROCESSED`, and `/actuator/health` including MongoDB. When processing throws, the service logs the failure with `eventId` and the message stays on the queue; Spring Cloud AWS then writes its own "Error processing message" line with the stack trace, which carries only the SQS message id. A body that can't be converted to a message with an `eventId` is logged by the framework, which includes the body, and is left on the queue until it goes to the DLQ.
 
 For production I'd add counters for received, duplicate, processed and failed events, a processing-time histogram and a gauge of stuck events, plus alarms on DLQ depth above zero, `ApproximateAgeOfOldestMessage`, stuck events and the 5xx rate. Tracing with OpenTelemetry, carrying the trace context in SQS message attributes, would join API and worker spans.
 

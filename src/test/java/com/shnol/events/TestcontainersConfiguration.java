@@ -24,7 +24,8 @@ class TestcontainersConfiguration {
 	@Bean
 	GenericContainer<?> elasticMqContainer() {
 		return new GenericContainer<>(DockerImageName.parse("softwaremill/elasticmq-native:1.7.1"))
-				.withCopyFileToContainer(MountableFile.forHostPath("elasticmq.conf"), "/opt/elasticmq.conf")
+				.withCopyFileToContainer(MountableFile.forHostPath("elasticmq.conf"), "/opt/elasticmq-production.conf")
+				.withCopyFileToContainer(MountableFile.forClasspathResource("elasticmq-test.conf"), "/opt/elasticmq.conf")
 				.withExposedPorts(ELASTICMQ_PORT)
 				.waitingFor(Wait.forLogMessage(".*ElasticMQ server.*started.*", 1));
 	}

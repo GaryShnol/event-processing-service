@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import org.springframework.web.util.UriComponentsBuilder;
 
 @RestController
 @RequestMapping("/api")
@@ -30,8 +30,7 @@ class EventController {
 	@PostMapping("/events")
 	ResponseEntity<CreateEventResponse> create(@Valid @RequestBody CreateEventRequest request) {
 		EventStatus status = service.create(request.toNewEvent());
-		URI location = ServletUriComponentsBuilder.fromCurrentContextPath()
-				.path("/api/events/{eventId}").buildAndExpand(request.eventId()).toUri();
+		URI location = UriComponentsBuilder.fromPath("/api/events/{eventId}").buildAndExpand(request.eventId()).toUri();
 		return ResponseEntity.accepted().location(location).body(new CreateEventResponse(request.eventId(), status));
 	}
 

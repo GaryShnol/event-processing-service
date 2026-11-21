@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
 import java.util.Map;
 import java.util.TreeMap;
@@ -20,6 +21,8 @@ public record NewEvent(
 		Map<String, String> metadata) {
 
 	public NewEvent {
+		// MongoDB stores dates in milliseconds; truncating here keeps the hash, the document and the response in agreement.
+		occurredAt = occurredAt.truncatedTo(ChronoUnit.MILLIS);
 		metadata = metadata == null ? Map.of() : Map.copyOf(metadata);
 	}
 

@@ -124,9 +124,10 @@ class EventRepositoryTest extends IntegrationTest {
 		assertThat(plan).contains("\"indexName\": \"" + IndexInitializer.CUSTOMER_INDEX + "\"").doesNotContain("\"SORT\"");
 	}
 
-	private String explain(Query query) {
-		Document sort = new Document("occurredAt", -1).append("_id", -1);
-		Document plan = mongoTemplate.getCollection("events").find(query.getQueryObject()).sort(sort).limit(20).explain();
+	private String explain(Query customerQuery) {
+		Query query = EventRepository.pagedQuery(customerQuery, PageRequest.of(1, 20));
+		Document plan = mongoTemplate.getCollection("events").find(query.getQueryObject())
+				.sort(query.getSortObject()).skip((int) query.getSkip()).limit(query.getLimit()).explain();
 		return plan.get("queryPlanner", Document.class).get("winningPlan", Document.class).toJson();
 	}
 

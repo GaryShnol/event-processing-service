@@ -39,6 +39,17 @@ class NewEventTest {
 	}
 
 	@Test
+	void timestampIsTruncatedToTheMillisecondsMongoDbStores() {
+		NewEvent precise = new NewEvent("evt-1", "customer-1", EventType.PAYMENT, new BigDecimal("10"), "ILS",
+				Instant.parse("2026-09-13T20:15:00.123456Z"), Map.of());
+		NewEvent millis = new NewEvent("evt-1", "customer-1", EventType.PAYMENT, new BigDecimal("10"), "ILS",
+				Instant.parse("2026-09-13T20:15:00.123Z"), Map.of());
+
+		assertThat(precise.occurredAt()).isEqualTo(Instant.parse("2026-09-13T20:15:00.123Z"));
+		assertThat(precise.payloadHash()).isEqualTo(millis.payloadHash());
+	}
+
+	@Test
 	void differentAmountChangesTheHash() {
 		assertThat(event("1250.51", Map.of()).payloadHash()).isNotEqualTo(event("1250.50", Map.of()).payloadHash());
 	}

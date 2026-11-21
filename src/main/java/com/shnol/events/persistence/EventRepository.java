@@ -37,8 +37,12 @@ public class EventRepository {
 	/** Newest first by occurredAt, then _id; served by the customer index without an in-memory sort. */
 	public Page<Event> findByCustomer(String customerId, Instant from, Instant to, EventStatus status, Pageable pageable) {
 		Query query = customerQuery(customerId, from, to, status);
-		List<Event> content = mongoTemplate.find(Query.of(query).with(pageable).with(NEWEST_FIRST), Event.class);
+		List<Event> content = mongoTemplate.find(pagedQuery(query, pageable), Event.class);
 		return PageableExecutionUtils.getPage(content, pageable, () -> mongoTemplate.count(query, Event.class));
+	}
+
+	static Query pagedQuery(Query query, Pageable pageable) {
+		return Query.of(query).with(pageable).with(NEWEST_FIRST);
 	}
 
 	static Query customerQuery(String customerId, Instant from, Instant to, EventStatus status) {

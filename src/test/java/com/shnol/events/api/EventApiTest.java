@@ -1,6 +1,7 @@
 package com.shnol.events.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -8,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import com.shnol.events.IntegrationTest;
 import com.shnol.events.messaging.EventPublisher;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -50,7 +52,7 @@ class EventApiTest extends IntegrationTest {
 
 		post(json(eventId, "customer-1", "1250.50", "2026-09-13T20:15:00Z"))
 				.expectStatus().isAccepted()
-				.expectHeader().value("Location", location -> assertThat(location).endsWith("/api/events/" + eventId))
+				.expectHeader().location("/api/events/" + eventId)
 				.expectBody()
 				.json("{\"eventId\":\"%s\",\"status\":\"RECEIVED\"}".formatted(eventId), JsonCompareMode.STRICT);
 
@@ -89,7 +91,7 @@ class EventApiTest extends IntegrationTest {
 
 		post(json(eventId, "customer-1", "1250.50", "2026-09-13T20:15:00Z"))
 				.expectStatus().isAccepted()
-				.expectHeader().value("Location", location -> assertThat(location).endsWith("/api/events/" + eventId))
+				.expectHeader().location("/api/events/" + eventId)
 				.expectBody().jsonPath("$.status").isEqualTo("RECEIVED");
 
 		verify(publisher, times(1)).publish(eventId);
@@ -105,6 +107,9 @@ class EventApiTest extends IntegrationTest {
 				.expectHeader().contentType(MediaType.APPLICATION_PROBLEM_JSON)
 				.expectBody().jsonPath("$.status").isEqualTo(409);
 
+		client.get().uri("/api/events/{id}", eventId).exchange()
+				.expectStatus().isOk()
+				.expectBody().jsonPath("$.amount").isEqualTo(1250.50);
 		verify(publisher, times(1)).publish(eventId);
 	}
 
@@ -140,25 +145,31 @@ class EventApiTest extends IntegrationTest {
 	@CsvSource(delimiter = '|', value = {
 			"eventId    | \"evt 1\"",
 			"eventId    | null",
+			"eventId    | \"\"",
+			"eventId    | \"evt-0123456789012345678901234567890123456789012345678901234567890\"",
 			"customerId | \"\"",
+			"customerId | \"customer/1\"",
 			"type       | \"TRANSFER\"",
 			"amount     | 0",
 			"amount     | -5",
 			"amount     | 10.001",
 			"amount     | \"ten\"",
+			"amount     | 1234567890123456.00",
 			"currency   | \"ABC\"",
 			"currency   | \"ils\"",
 			"timestamp  | null",
 			"timestamp  | \"yesterday\"",
 			"metadata   | {\"a.b\":\"x\"}",
 			"metadata   | {\"source\":null}",
+			"metadata   | {\"k0123456789012345678901234567890123456789012345678901234567890123\":\"x\"}",
+			"metadata   | {\"source\":\"%s\"}",
 	})
 	void invalidFieldIsRejectedWithTheFieldNamed(String field, String value) {
-		Map<String, String> fields = new java.util.LinkedHashMap<>(Map.of(
+		Map<String, String> fields = new LinkedHashMap<>(Map.of(
 				"eventId", "\"" + eventId() + "\"", "customerId", "\"customer-1\"", "type", "\"PAYMENT\"",
 				"amount", "10.00", "currency", "\"ILS\"", "timestamp", "\"2026-09-13T20:15:00Z\"",
 				"metadata", "{\"source\":\"mobile\"}"));
-		fields.put(field, value);
+		fields.put(field, value.replace("%s", "x".repeat(257)));
 		String body = fields.entrySet().stream()
 				.map(entry -> "\"%s\":%s".formatted(entry.getKey(), entry.getValue()))
 				.collect(Collectors.joining(",", "{", "}"));
@@ -166,9 +177,10 @@ class EventApiTest extends IntegrationTest {
 		post(body).expectStatus().isBadRequest()
 				.expectHeader().contentType(MediaType.APPLICATION_PROBLEM_JSON)
 				.expectBody()
+				.jsonPath("$.errors.length()").isEqualTo(1)
 				.jsonPath("$.errors[0].field").isEqualTo(field)
 				.jsonPath("$.errors[0].message").isNotEmpty();
-		verify(publisher, never()).publish(org.mockito.ArgumentMatchers.any());
+		verify(publisher, never()).publish(any());
 	}
 
 	@Test

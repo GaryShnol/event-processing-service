@@ -41,14 +41,14 @@ flowchart TD
 | Package | Responsibility |
 | --- | --- |
 | `api` | `EventController`, request and response records with Bean Validation, `GlobalExceptionHandler`, `EventIdMdcFilter` |
-| `application` | `EventService` (create, get, customer query), `EventProcessingService` (claim, run the rule, complete or fail) |
+| `application` | `EventService` (create, get, customer query), `EventProcessingService` (claim, run the rule, complete or fail), the `EventPublisher` interface |
 | `domain` | `Event`, `NewEvent` (with the payload hash), `EventStatus`, `EventType`, `EventProcessor` (the business rule) |
 | `persistence` | `EventRepository` (reads, insert), `EventStateStore` (atomic transitions), `IndexInitializer` |
-| `messaging` | `EventPublisher` and `SqsEventPublisher`, `EventMessageListener`, `EventMessageErrorHandler`, `QueueSettingsCheck` |
+| `messaging` | `SqsEventPublisher` (implements `EventPublisher`), `EventMessageListener`, `EventMessageErrorHandler`, `QueueSettingsCheck` |
 | `recovery` | `StuckEventSweeper` |
 | `config` | `EventsProperties` (every limit, timeout and queue name), the `Clock` |
 
-`domain` depends on nothing else in the app. The stack is Java 21, Spring Boot 4.1 with Spring Data MongoDB, Spring Cloud AWS 4.1 for SQS (`SqsTemplate` to send, `@SqsListener` to receive), MongoDB 8.0, and ElasticMQ as SQS locally and in tests.
+`domain` depends on nothing else in the app, and `application` doesn't depend on `messaging`: it publishes through its own `EventPublisher` interface. The stack is Java 21, Spring Boot 4.1 with Spring Data MongoDB, Spring Cloud AWS 4.1 for SQS (`SqsTemplate` to send, `@SqsListener` to receive), MongoDB 8.0, and ElasticMQ as SQS locally and in tests.
 
 ## Event lifecycle
 

@@ -1,5 +1,6 @@
 package com.shnol.events.messaging;
 
+import com.shnol.events.application.EventPublisher;
 import com.shnol.events.config.EventsProperties;
 import io.awspring.cloud.sqs.operations.SqsTemplate;
 import org.springframework.stereotype.Component;

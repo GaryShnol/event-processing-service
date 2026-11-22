@@ -7,7 +7,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.shnol.events.IntegrationTest;
-import com.shnol.events.messaging.EventPublisher;
+import com.shnol.events.application.EventPublisher;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;

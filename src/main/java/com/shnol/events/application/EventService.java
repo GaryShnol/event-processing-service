@@ -4,7 +4,6 @@ import com.shnol.events.config.EventsProperties;
 import com.shnol.events.domain.Event;
 import com.shnol.events.domain.EventStatus;
 import com.shnol.events.domain.NewEvent;
-import com.shnol.events.messaging.EventPublisher;
 import com.shnol.events.persistence.EventRepository;
 import java.time.Clock;
 import java.time.Instant;

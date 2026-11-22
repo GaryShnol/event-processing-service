@@ -10,12 +10,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.shnol.events.application.EventPublisher;
 import com.shnol.events.config.EventsProperties;
 import com.shnol.events.domain.Event;
 import com.shnol.events.domain.EventStatus;
 import com.shnol.events.domain.EventType;
 import com.shnol.events.domain.NewEvent;
-import com.shnol.events.messaging.EventPublisher;
 import com.shnol.events.persistence.EventRepository;
 import com.shnol.events.persistence.EventStateStore;
 import java.math.BigDecimal;

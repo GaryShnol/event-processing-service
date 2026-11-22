@@ -1,8 +1,8 @@
 package com.shnol.events.recovery;
 
+import com.shnol.events.application.EventPublisher;
 import com.shnol.events.config.EventsProperties;
 import com.shnol.events.domain.Event;
-import com.shnol.events.messaging.EventPublisher;
 import com.shnol.events.persistence.EventRepository;
 import com.shnol.events.persistence.EventStateStore;
 import java.time.Clock;

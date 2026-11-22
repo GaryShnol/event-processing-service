@@ -15,7 +15,6 @@ import com.shnol.events.domain.Event;
 import com.shnol.events.domain.EventStatus;
 import com.shnol.events.domain.EventType;
 import com.shnol.events.domain.NewEvent;
-import com.shnol.events.messaging.EventPublisher;
 import com.shnol.events.persistence.EventRepository;
 import java.math.BigDecimal;
 import java.time.Clock;

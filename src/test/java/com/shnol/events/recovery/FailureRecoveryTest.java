@@ -8,13 +8,13 @@ import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.verify;
 
 import com.shnol.events.IntegrationTest;
+import com.shnol.events.application.EventPublisher;
 import com.shnol.events.config.EventsProperties;
 import com.shnol.events.domain.Event;
 import com.shnol.events.domain.EventProcessor;
 import com.shnol.events.domain.EventStatus;
 import com.shnol.events.domain.EventType;
 import com.shnol.events.domain.NewEvent;
-import com.shnol.events.messaging.EventPublisher;
 import com.shnol.events.persistence.EventRepository;
 import java.math.BigDecimal;
 import java.time.Duration;

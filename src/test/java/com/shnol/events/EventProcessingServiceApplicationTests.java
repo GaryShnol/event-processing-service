@@ -38,7 +38,7 @@ class EventProcessingServiceApplicationTests extends IntegrationTest {
 	@Test
 	void eventsQueueRedrivesToDeadLetterQueueAfterFiveReceives() {
 		Map<QueueAttributeName, String> eventsQueue = attributes(properties.queues().events());
-		Map<QueueAttributeName, String> deadLetterQueue = attributes(properties.queues().deadLetter());
+		Map<QueueAttributeName, String> deadLetterQueue = attributes("events-dlq");
 
 		assertThat(eventsQueue.get(QueueAttributeName.VISIBILITY_TIMEOUT)).isEqualTo("90");
 		assertThat(eventsQueue.get(QueueAttributeName.REDRIVE_POLICY))
@@ -49,7 +49,6 @@ class EventProcessingServiceApplicationTests extends IntegrationTest {
 	@Test
 	void loadsDefaultsFromApplicationYaml() {
 		assertThat(properties.queues().events()).isEqualTo("events-queue");
-		assertThat(properties.queues().deadLetter()).isEqualTo("events-dlq");
 		assertThat(properties.lease()).isEqualTo(Duration.ofSeconds(60));
 		assertThat(properties.maxAttempts()).isEqualTo(3);
 		assertThat(properties.maxAmount()).isEqualByComparingTo(new BigDecimal("10000.00"));

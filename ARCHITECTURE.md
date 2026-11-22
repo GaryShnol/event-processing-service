@@ -46,7 +46,7 @@ flowchart TD
 | `persistence` | `EventRepository` (reads, insert), `EventStateStore` (atomic transitions), `IndexInitializer` |
 | `messaging` | `SqsEventPublisher` (implements `EventPublisher`), `EventMessageListener`, `EventMessageErrorHandler`, `QueueSettingsCheck` |
 | `recovery` | `StuckEventSweeper` |
-| `config` | `EventsProperties` (every limit, timeout and queue name), the `Clock` |
+| `config` | `EventsProperties` (every limit and timeout, and the events queue name; the DLQ is named only in the queue's redrive policy), the `Clock` |
 
 `domain` depends on nothing else in the app, and `application` doesn't depend on `messaging`: it publishes through its own `EventPublisher` interface. The stack is Java 21, Spring Boot 4.1 with Spring Data MongoDB, Spring Cloud AWS 4.1 for SQS (`SqsTemplate` to send, `@SqsListener` to receive), MongoDB 8.0, and ElasticMQ as SQS locally and in tests.
 

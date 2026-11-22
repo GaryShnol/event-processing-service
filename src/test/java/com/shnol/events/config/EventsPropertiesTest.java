@@ -15,7 +15,6 @@ class EventsPropertiesTest {
 			.withUserConfiguration(PropertiesConfiguration.class)
 			.withPropertyValues(
 					"events.queues.events=events-queue",
-					"events.queues.dead-letter=events-dlq",
 					"events.lease=60s",
 					"events.max-attempts=3",
 					"events.max-amount=10000.00",

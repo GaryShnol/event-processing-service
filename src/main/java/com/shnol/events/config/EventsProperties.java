@@ -23,7 +23,7 @@ public record EventsProperties(
 		@Valid @NotNull Paging paging,
 		@Valid @NotNull Metadata metadata) {
 
-	public record Queues(@NotBlank String events, @NotBlank String deadLetter) {
+	public record Queues(@NotBlank String events) {
 	}
 
 	public record Sweeper(

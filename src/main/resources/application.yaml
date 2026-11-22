@@ -16,7 +16,6 @@ spring:
 events:
   queues:
     events: ${EVENTS_QUEUE:events-queue}
-    dead-letter: ${EVENTS_DLQ:events-dlq}
   lease: ${PROCESSING_LEASE:60s}
   max-attempts: ${PROCESSING_MAX_ATTEMPTS:3}
   max-amount: ${MAX_AMOUNT:10000.00}

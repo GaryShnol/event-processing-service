@@ -50,7 +50,7 @@ class QueueSettingsCheckTest extends IntegrationTest {
 	@Test
 	void refusesQueueWithoutRedrivePolicy() {
 		EventsProperties pointingAtDeadLetterQueue = new EventsProperties(
-				new EventsProperties.Queues("events-dlq", "events-dlq"), Duration.ofSeconds(10),
+				new EventsProperties.Queues("events-dlq"), Duration.ofSeconds(10),
 				properties.maxAttempts(), properties.maxAmount(), properties.sweeper(), properties.paging(),
 				properties.metadata());
 

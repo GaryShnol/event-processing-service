@@ -40,7 +40,6 @@ import software.amazon.awssdk.services.sqs.model.Message;
 // The sweeper runs every second and re-publishes after 5 s, later than a redelivery.
 @TestPropertySource(properties = {
 		"events.queues.events=fast-events-queue",
-		"events.queues.dead-letter=fast-events-dlq",
 		"events.lease=1s",
 		"events.sweeper.enabled=true",
 		"events.sweeper.interval=1s",
@@ -171,7 +170,7 @@ class FailureRecoveryTest extends IntegrationTest {
 	}
 
 	private void awaitInDeadLetterQueue(String body) {
-		String deadLetterUrl = queueUrl(properties.queues().deadLetter());
+		String deadLetterUrl = queueUrl("fast-events-dlq");
 		await().atMost(TIMEOUT).untilAsserted(() -> {
 			List<Message> messages = sqsClient.receiveMessage(request -> request.queueUrl(deadLetterUrl)
 					.maxNumberOfMessages(10).visibilityTimeout(0).waitTimeSeconds(1)).join().messages();

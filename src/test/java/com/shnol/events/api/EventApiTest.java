@@ -159,6 +159,9 @@ class EventApiTest extends IntegrationTest {
 			"currency   | \"ils\"",
 			"timestamp  | null",
 			"timestamp  | \"yesterday\"",
+			"timestamp  | \"1969-12-31T23:59:59.999Z\"",
+			"timestamp  | \"+10000-01-01T00:00:00Z\"",
+			"timestamp  | \"+1000000000-12-31T23:59:59.999999999Z\"",
 			"metadata   | {\"a.b\":\"x\"}",
 			"metadata   | {\"source\":null}",
 			"metadata   | {\"k0123456789012345678901234567890123456789012345678901234567890123\":\"x\"}",
@@ -181,6 +184,18 @@ class EventApiTest extends IntegrationTest {
 				.jsonPath("$.errors[0].field").isEqualTo(field)
 				.jsonPath("$.errors[0].message").isNotEmpty();
 		verify(publisher, never()).publish(any());
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@CsvSource({ "1970-01-01T00:00:00Z", "9999-12-31T23:59:59.999Z" })
+	void timestampAtTheEdgeOfTheStorableRangeIsAcceptedAndReadBack(String timestamp) {
+		String eventId = eventId();
+
+		post(json(eventId, "customer-1", "10.00", timestamp)).expectStatus().isAccepted();
+
+		client.get().uri("/api/events/{id}", eventId).exchange()
+				.expectStatus().isOk()
+				.expectBody().jsonPath("$.timestamp").isEqualTo(timestamp);
 	}
 
 	@Test

@@ -16,7 +16,7 @@ public record CreateEventRequest(
 		@NotNull EventType type,
 		@NotNull @Positive @Digits(integer = 15, fraction = 2) BigDecimal amount,
 		@NotNull @IsoCurrency String currency,
-		@NotNull Instant timestamp,
+		@NotNull @StorableTimestamp Instant timestamp,
 		@BoundedMetadata Map<String, String> metadata) {
 
 	static final String ID_PATTERN = "[A-Za-z0-9_-]{1,64}";

@@ -22,7 +22,7 @@ A Spring Boot service that accepts business events over REST, stores them in Mon
 
 1. Keep it simple. Comments only for the reason behind a non-obvious decision. Catch an exception only where you handle it specifically.
 2. Packages: `api`, `application`, `domain`, `persistence`, `messaging`, `recovery`, `config`. `domain` depends on nothing in the app.
-3. MongoDB only through `EventRepository` (reads, insert) and `EventStateStore` (atomic transitions). SQS only through `EventPublisher`, `EventMessageListener` and `QueueSettingsCheck` (startup check of queue settings).
+3. MongoDB only through `EventRepository` (reads, insert) and `EventStateStore` (atomic transitions). SQS only through `SqsEventPublisher` (behind the `EventPublisher` interface in `application`), `EventMessageListener` and `QueueSettingsCheck` (startup check of queue settings).
 4. Every correctness-critical state change is one atomic, conditional MongoDB operation. Never read-then-write. Duplicates are detected by `DuplicateKeyException`, never check-then-insert.
 5. Acknowledge a message only after the final state is stored, or when no work is needed.
 6. Money is `BigDecimal`. Times are `Instant` from an injected `Clock`. Statuses are the enum. Limits, timeouts and queue names live in one `@ConfigurationProperties` record.

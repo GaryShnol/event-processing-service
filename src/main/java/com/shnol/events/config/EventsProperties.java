@@ -16,14 +16,16 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties("events")
 public record EventsProperties(
 		@Valid @NotNull Queues queues,
+		@NotNull @DurationMin(millis = 100) Duration publishTimeout,
 		@NotNull @DurationMin(seconds = 1) Duration lease,
 		@Min(1) int maxAttempts,
 		@NotNull @Positive BigDecimal maxAmount,
 		@Valid @NotNull Sweeper sweeper,
 		@Valid @NotNull Paging paging,
-		@Valid @NotNull Metadata metadata) {
+		@Valid @NotNull Metadata metadata,
+		@Valid @NotNull Mongo mongo) {
 
-	public record Queues(@NotBlank String events, @NotBlank String deadLetter) {
+	public record Queues(@NotBlank String events) {
 	}
 
 	public record Sweeper(
@@ -32,7 +34,7 @@ public record EventsProperties(
 			@Min(1) int batchSize) {
 	}
 
-	public record Paging(@Min(1) int defaultSize, @Min(1) int maxSize) {
+	public record Paging(@Min(1) int defaultSize, @Min(1) int maxSize, @Min(1) int maxOffset) {
 
 		@AssertTrue(message = "defaultSize must not exceed maxSize")
 		public boolean isDefaultSizeWithinMax() {
@@ -41,5 +43,10 @@ public record EventsProperties(
 	}
 
 	public record Metadata(@Min(1) int maxEntries, @Min(1) int maxKeyLength, @Min(1) int maxValueLength) {
+	}
+
+	public record Mongo(
+			@NotNull @DurationMin(millis = 100) Duration serverSelectionTimeout,
+			@NotNull @DurationMin(millis = 100) Duration operationTimeout) {
 	}
 }

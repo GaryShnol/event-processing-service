@@ -1,5 +1,6 @@
 package com.shnol.events.api;
 
+import com.mongodb.MongoTimeoutException;
 import com.shnol.events.application.EventConflictException;
 import com.shnol.events.application.EventNotFoundException;
 import com.shnol.events.application.InvalidQueryException;
@@ -9,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.TypeMismatchException;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.data.mongodb.UncategorizedMongoDbException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -52,8 +54,14 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
 	@ExceptionHandler
 	ProblemDetail handleDatabaseUnavailable(DataAccessResourceFailureException e) {
-		log.error("MongoDB is unavailable", e);
-		return ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, "The service is temporarily unavailable");
+		return databaseUnavailable(e);
+	}
+
+	// With an operation timeout set, the driver reports every timeout, server selection included, as a MongoTimeoutException
+	// subtype that Spring Data translates to UncategorizedMongoDbException instead of a resource failure.
+	@ExceptionHandler
+	ProblemDetail handleUncategorizedDatabaseError(UncategorizedMongoDbException e) {
+		return e.getCause() instanceof MongoTimeoutException ? databaseUnavailable(e) : handleUnexpected(e);
 	}
 
 	@ExceptionHandler
@@ -97,6 +105,11 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 			return ResponseEntity.badRequest().body(badRequest(List.of(new FieldError(field, "has an invalid value"))));
 		}
 		return ResponseEntity.badRequest().body(ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Malformed request body"));
+	}
+
+	private static ProblemDetail databaseUnavailable(Exception e) {
+		log.error("MongoDB is unavailable", e);
+		return ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, "The service is temporarily unavailable");
 	}
 
 	private static ProblemDetail badRequest(List<FieldError> errors) {

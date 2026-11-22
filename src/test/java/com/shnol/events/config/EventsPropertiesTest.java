@@ -15,7 +15,7 @@ class EventsPropertiesTest {
 			.withUserConfiguration(PropertiesConfiguration.class)
 			.withPropertyValues(
 					"events.queues.events=events-queue",
-					"events.queues.dead-letter=events-dlq",
+					"events.publish-timeout=3s",
 					"events.lease=60s",
 					"events.max-attempts=3",
 					"events.max-amount=10000.00",
@@ -24,9 +24,12 @@ class EventsPropertiesTest {
 					"events.sweeper.batch-size=100",
 					"events.paging.default-size=20",
 					"events.paging.max-size=100",
+					"events.paging.max-offset=10000",
 					"events.metadata.max-entries=20",
 					"events.metadata.max-key-length=64",
-					"events.metadata.max-value-length=256");
+					"events.metadata.max-value-length=256",
+					"events.mongo.server-selection-timeout=5s",
+					"events.mongo.operation-timeout=10s");
 
 	@Test
 	void bindsValidProperties() {
@@ -49,6 +52,11 @@ class EventsPropertiesTest {
 	}
 
 	@Test
+	void rejectsPublishTimeoutShorterThan100Milliseconds() {
+		assertRejected("events.publish-timeout=50ms", "publishTimeout");
+	}
+
+	@Test
 	void rejectsLeaseShorterThanOneSecond() {
 		assertRejected("events.lease=0s", "lease");
 	}
@@ -66,6 +74,11 @@ class EventsPropertiesTest {
 	@Test
 	void rejectsZeroMetadataEntries() {
 		assertRejected("events.metadata.max-entries=0", "metadata.maxEntries");
+	}
+
+	@Test
+	void rejectsMongoOperationTimeoutShorterThan100Milliseconds() {
+		assertRejected("events.mongo.operation-timeout=0s", "mongo.operationTimeout");
 	}
 
 	private void assertRejected(String property, String field) {

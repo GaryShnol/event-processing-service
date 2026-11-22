@@ -38,7 +38,7 @@ class EventProcessingServiceApplicationTests extends IntegrationTest {
 	@Test
 	void eventsQueueRedrivesToDeadLetterQueueAfterFiveReceives() {
 		Map<QueueAttributeName, String> eventsQueue = attributes(properties.queues().events());
-		Map<QueueAttributeName, String> deadLetterQueue = attributes(properties.queues().deadLetter());
+		Map<QueueAttributeName, String> deadLetterQueue = attributes("events-dlq");
 
 		assertThat(eventsQueue.get(QueueAttributeName.VISIBILITY_TIMEOUT)).isEqualTo("90");
 		assertThat(eventsQueue.get(QueueAttributeName.REDRIVE_POLICY))
@@ -49,7 +49,7 @@ class EventProcessingServiceApplicationTests extends IntegrationTest {
 	@Test
 	void loadsDefaultsFromApplicationYaml() {
 		assertThat(properties.queues().events()).isEqualTo("events-queue");
-		assertThat(properties.queues().deadLetter()).isEqualTo("events-dlq");
+		assertThat(properties.publishTimeout()).isEqualTo(Duration.ofSeconds(3));
 		assertThat(properties.lease()).isEqualTo(Duration.ofSeconds(60));
 		assertThat(properties.maxAttempts()).isEqualTo(3);
 		assertThat(properties.maxAmount()).isEqualByComparingTo(new BigDecimal("10000.00"));
@@ -58,7 +58,9 @@ class EventProcessingServiceApplicationTests extends IntegrationTest {
 		assertThat(properties.sweeper().batchSize()).isEqualTo(100);
 		assertThat(properties.paging().defaultSize()).isEqualTo(20);
 		assertThat(properties.paging().maxSize()).isEqualTo(100);
+		assertThat(properties.paging().maxOffset()).isEqualTo(10000);
 		assertThat(properties.metadata()).isEqualTo(new EventsProperties.Metadata(20, 64, 256));
+		assertThat(properties.mongo()).isEqualTo(new EventsProperties.Mongo(Duration.ofSeconds(5), Duration.ofSeconds(10)));
 	}
 
 	@Test

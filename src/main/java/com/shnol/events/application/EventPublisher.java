@@ -1,4 +1,4 @@
-package com.shnol.events.messaging;
+package com.shnol.events.application;
 
 /** Sends the "process event X" signal. The queue carries only the eventId; MongoDB holds the state. */
 public interface EventPublisher {

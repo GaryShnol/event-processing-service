@@ -4,7 +4,6 @@ import com.shnol.events.config.EventsProperties;
 import com.shnol.events.domain.Event;
 import com.shnol.events.domain.EventStatus;
 import com.shnol.events.domain.NewEvent;
-import com.shnol.events.messaging.EventPublisher;
 import com.shnol.events.persistence.EventRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -69,6 +68,10 @@ public class EventService {
 			throw new InvalidQueryException("from", "must not be after to");
 		}
 		int pageSize = size == null ? properties.paging().defaultSize() : size;
+		int maxOffset = properties.paging().maxOffset();
+		if ((long) page * pageSize > maxOffset) {
+			throw new InvalidQueryException("page", "page * size must be at most " + maxOffset);
+		}
 		return repository.findByCustomer(customerId, from, to, status, PageRequest.of(page, pageSize));
 	}
 

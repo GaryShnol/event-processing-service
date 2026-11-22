@@ -160,7 +160,7 @@ curl -s "http://localhost:8080/api/customers/customer-42/events?from=2026-11-01T
 {"content":[{"eventId":"evt-1001","customerId":"customer-42","type":"PAYMENT","amount":1250.50,"currency":"ILS","status":"PROCESSED","timestamp":"2026-11-01T10:15:00Z","createdAt":"2026-11-21T20:56:34.285Z","processedAt":"2026-11-21T20:56:34.379Z","failureReason":null}],"page":0,"size":10,"totalElements":1,"totalPages":1}
 ```
 
-A page larger than 100, or `from` after `to`, is rejected:
+A page larger than 100, `from` after `to`, or an offset (`page * size`) above 10,000 is rejected:
 
 ```
 curl -s -i "http://localhost:8080/api/customers/customer-42/events?size=500"
@@ -182,6 +182,7 @@ An event is stored as `RECEIVED` and its `eventId` is put on the queue. A worker
 - `_id` is the `eventId`: duplicate and concurrent `POST`s are decided by the unique index, never by a lookup first. [Idempotency and race conditions](ARCHITECTURE.md#idempotency-and-race-conditions)
 - A worker claims an event with one atomic `findAndModify` and a lease, and completes it only with its own claim token. [Processing flow](ARCHITECTURE.md#processing-flow)
 - SQS redelivery is the retry; MongoDB counts attempts and decides when an event is `FAILED`; a sweeper re-publishes events whose message was never sent or got lost. [Failure handling and retries](ARCHITECTURE.md#failure-handling-and-retries)
+- Every MongoDB operation times out after 10 seconds (`503`) and the publish after 3 seconds (`202`, the sweeper publishes later), so a dependency that hangs instead of failing can't block the API or the workers. [Failure handling and retries](ARCHITECTURE.md#failure-handling-and-retries)
 - One compound index serves the customer query with and without `status`; a partial index keeps the sweeper's scan small. [Data model and indexes](ARCHITECTURE.md#data-model-and-indexes)
 - SQS Standard because each event is an independent job, and SQS gives per-message acknowledgement, a visibility timeout and a DLQ. ElasticMQ locally because current LocalStack images need an auth token. Spring Boot 4.1 because 3.5 is out of open-source support. [Decisions and trade-offs](ARCHITECTURE.md#decisions-and-trade-offs)
 

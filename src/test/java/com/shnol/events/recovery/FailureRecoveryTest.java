@@ -5,16 +5,17 @@ import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.shnol.events.IntegrationTest;
+import com.shnol.events.application.EventPublisher;
 import com.shnol.events.config.EventsProperties;
 import com.shnol.events.domain.Event;
 import com.shnol.events.domain.EventProcessor;
 import com.shnol.events.domain.EventStatus;
 import com.shnol.events.domain.EventType;
 import com.shnol.events.domain.NewEvent;
-import com.shnol.events.messaging.EventPublisher;
 import com.shnol.events.persistence.EventRepository;
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -40,7 +41,6 @@ import software.amazon.awssdk.services.sqs.model.Message;
 // The sweeper runs every second and re-publishes after 5 s, later than a redelivery.
 @TestPropertySource(properties = {
 		"events.queues.events=fast-events-queue",
-		"events.queues.dead-letter=fast-events-dlq",
 		"events.lease=1s",
 		"events.sweeper.enabled=true",
 		"events.sweeper.interval=1s",
@@ -85,6 +85,9 @@ class FailureRecoveryTest extends IntegrationTest {
 				("\"message\":\"Processing failed, the message will be redelivered: "
 						+ "org.springframework.dao.DataAccessResourceFailureException: simulated outage\",\"eventId\":\"%s\"")
 						.formatted(eventId));
+		// Only the POST published: SQS redelivered the unacknowledged message. Had it been acknowledged after the
+		// exception, the sweeper would have re-published the stuck event and still reached PROCESSED.
+		verify(publisher, times(1)).publish(eventId);
 	}
 
 	@Test
@@ -171,7 +174,7 @@ class FailureRecoveryTest extends IntegrationTest {
 	}
 
 	private void awaitInDeadLetterQueue(String body) {
-		String deadLetterUrl = queueUrl(properties.queues().deadLetter());
+		String deadLetterUrl = queueUrl("fast-events-dlq");
 		await().atMost(TIMEOUT).untilAsserted(() -> {
 			List<Message> messages = sqsClient.receiveMessage(request -> request.queueUrl(deadLetterUrl)
 					.maxNumberOfMessages(10).visibilityTimeout(0).waitTimeSeconds(1)).join().messages();

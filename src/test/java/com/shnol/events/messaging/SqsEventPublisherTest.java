@@ -3,6 +3,7 @@ package com.shnol.events.messaging;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.shnol.events.IntegrationTest;
+import com.shnol.events.application.EventPublisher;
 import com.shnol.events.config.EventsProperties;
 import io.awspring.cloud.sqs.listener.MessageListenerContainer;
 import io.awspring.cloud.sqs.listener.MessageListenerContainerRegistry;

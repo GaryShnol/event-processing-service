@@ -10,12 +10,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.shnol.events.application.EventPublisher;
 import com.shnol.events.config.EventsProperties;
 import com.shnol.events.domain.Event;
 import com.shnol.events.domain.EventStatus;
 import com.shnol.events.domain.EventType;
 import com.shnol.events.domain.NewEvent;
-import com.shnol.events.messaging.EventPublisher;
 import com.shnol.events.persistence.EventRepository;
 import com.shnol.events.persistence.EventStateStore;
 import java.math.BigDecimal;
@@ -48,10 +48,11 @@ class StuckEventSweeperTest {
 	private EventPublisher publisher;
 
 	private StuckEventSweeper sweeper() {
-		EventsProperties properties = new EventsProperties(new EventsProperties.Queues("events-queue", "events-dlq"),
-				Duration.ofSeconds(60), 3, new BigDecimal("10000.00"),
+		EventsProperties properties = new EventsProperties(new EventsProperties.Queues("events-queue"),
+				Duration.ofSeconds(3), Duration.ofSeconds(60), 3, new BigDecimal("10000.00"),
 				new EventsProperties.Sweeper(Duration.ofSeconds(30), Duration.ofMinutes(2), 50),
-				new EventsProperties.Paging(20, 100), new EventsProperties.Metadata(20, 64, 256));
+				new EventsProperties.Paging(20, 100, 10000), new EventsProperties.Metadata(20, 64, 256),
+				new EventsProperties.Mongo(Duration.ofSeconds(5), Duration.ofSeconds(10)));
 		return new StuckEventSweeper(stateStore, repository, publisher, Clock.fixed(NOW, ZoneOffset.UTC), properties);
 	}
 

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+import com.mongodb.MongoOperationTimeoutException;
 import com.shnol.events.application.EventService;
 import com.shnol.events.config.EventsProperties;
 import org.junit.jupiter.api.Test;
@@ -15,6 +16,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.data.mongodb.UncategorizedMongoDbException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -41,6 +43,21 @@ class GlobalExceptionHandlerTest {
 				.bodyJson()
 				.hasPathSatisfying("$.detail", detail -> assertThat(detail).asString().isEqualTo("The service is temporarily unavailable"))
 				.satisfies(body -> assertThat(body.getJson()).doesNotContain("mongo:27017"));
+	}
+
+	@Test
+	void databaseOperationTimeoutIsServiceUnavailable() {
+		when(service.get("evt-1")).thenThrow(new UncategorizedMongoDbException("Operation exceeded the timeout limit",
+				new MongoOperationTimeoutException("Operation exceeded the timeout limit")));
+
+		assertThat(mvc.get().uri("/api/events/evt-1")).hasStatus(HttpStatus.SERVICE_UNAVAILABLE);
+	}
+
+	@Test
+	void otherUncategorizedDatabaseErrorIsInternalServerError() {
+		when(service.get("evt-1")).thenThrow(new UncategorizedMongoDbException("something else", new IllegalStateException()));
+
+		assertThat(mvc.get().uri("/api/events/evt-1")).hasStatus(HttpStatus.INTERNAL_SERVER_ERROR);
 	}
 
 	@Test

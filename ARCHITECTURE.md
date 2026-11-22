@@ -107,7 +107,7 @@ As data grows, point reads and customer queries stay on indexes. Two things degr
 Create:
 1. Validate the request and `insert` it with `status = RECEIVED`.
 2. On `DuplicateKeyException`, compare `payloadHash`: same returns the current status, different returns `409`. No check-then-insert, so concurrent duplicates are decided by the unique index.
-3. Publish `{eventId}` to SQS and return `202`. If the publish fails, the service logs it and still returns `202`; the sweeper publishes it later.
+3. Publish `{eventId}` to SQS and return `202`. If the publish fails or takes longer than 3 seconds, the service logs it and still returns `202`; the sweeper publishes it later.
 
 Process:
 1. Claim with one `findAndModify`: match `_id` where the status is `RECEIVED`, or `PROCESSING` with an expired lease, and `attempts < maxAttempts`. Set `PROCESSING`, a new `claimToken`, `lockedUntil = now + 60 s`, and increment `attempts`.
@@ -143,7 +143,7 @@ The lease makes MongoDB state change exactly once. It can't do that for a call t
 | Attempts exhausted | Once the last lease expires, the sweeper marks the event `FAILED` with "max attempts exceeded" |
 | MongoDB down or not answering during `POST` | `503` within 5 or 10 seconds; the client retries; nothing is half-written. The same operation timeout keeps a hung MongoDB from blocking workers and the sweeper |
 | MongoDB down during processing | Redelivered; after 5 receives the message goes to the DLQ, but MongoDB still shows the event unfinished, so the sweeper re-publishes it when MongoDB is back |
-| Publish fails after insert | Logged at WARN, `202`; the sweeper publishes it once `lastPublishedAt` is older than 2 minutes |
+| Publish fails after insert, or SQS doesn't answer within 3 s | Logged at WARN, `202`; the sweeper publishes it once `lastPublishedAt` is older than 2 minutes. The 3 s bound (`PUBLISH_TIMEOUT`) is on the send only, not on the shared SQS client, because a client-wide timeout shorter than the listener's long poll would break receiving |
 | Duplicate delivery | Claim matches nothing; acknowledged |
 | Crash mid-processing | Message redelivered and lease expires, so another worker claims it; if the message is gone, the sweeper re-publishes |
 | Poison message (not JSON, or no `eventId`) | Not acknowledged; DLQ after 5 receives |

@@ -50,7 +50,7 @@ class EventServiceTest {
 
 	private EventService service() {
 		EventsProperties properties = new EventsProperties(new EventsProperties.Queues("events-queue"),
-				Duration.ofSeconds(60), 3, new BigDecimal("10000.00"),
+				Duration.ofSeconds(3), Duration.ofSeconds(60), 3, new BigDecimal("10000.00"),
 				new EventsProperties.Sweeper(Duration.ofSeconds(30), Duration.ofMinutes(2), 100),
 				new EventsProperties.Paging(20, 100), new EventsProperties.Metadata(20, 64, 256));
 		return new EventService(repository, publisher, Clock.fixed(NOW, ZoneOffset.UTC), properties);

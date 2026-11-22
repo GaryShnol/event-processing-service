@@ -15,6 +15,7 @@ class EventsPropertiesTest {
 			.withUserConfiguration(PropertiesConfiguration.class)
 			.withPropertyValues(
 					"events.queues.events=events-queue",
+					"events.publish-timeout=3s",
 					"events.lease=60s",
 					"events.max-attempts=3",
 					"events.max-amount=10000.00",
@@ -45,6 +46,11 @@ class EventsPropertiesTest {
 	@Test
 	void rejectsBlankQueueName() {
 		assertRejected("events.queues.events=", "queues.events");
+	}
+
+	@Test
+	void rejectsPublishTimeoutShorterThan100Milliseconds() {
+		assertRejected("events.publish-timeout=50ms", "publishTimeout");
 	}
 
 	@Test

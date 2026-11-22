@@ -16,6 +16,7 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties("events")
 public record EventsProperties(
 		@Valid @NotNull Queues queues,
+		@NotNull @DurationMin(millis = 100) Duration publishTimeout,
 		@NotNull @DurationMin(seconds = 1) Duration lease,
 		@Min(1) int maxAttempts,
 		@NotNull @Positive BigDecimal maxAmount,

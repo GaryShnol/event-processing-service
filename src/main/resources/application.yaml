@@ -16,6 +16,8 @@ spring:
 events:
   queues:
     events: ${EVENTS_QUEUE:events-queue}
+  # Bounds one publish; on timeout the event stays stored and the sweeper publishes it later.
+  publish-timeout: ${PUBLISH_TIMEOUT:3s}
   lease: ${PROCESSING_LEASE:60s}
   max-attempts: ${PROCESSING_MAX_ATTEMPTS:3}
   max-amount: ${MAX_AMOUNT:10000.00}

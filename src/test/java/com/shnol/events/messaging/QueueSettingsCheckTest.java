@@ -29,9 +29,9 @@ class QueueSettingsCheckTest extends IntegrationTest {
 
 	@Test
 	void refusesLeaseEqualToVisibilityTimeout() {
-		EventsProperties withLongLease = new EventsProperties(properties.queues(), Duration.ofSeconds(90),
-				properties.maxAttempts(), properties.maxAmount(), properties.sweeper(), properties.paging(),
-				properties.metadata());
+		EventsProperties withLongLease = new EventsProperties(properties.queues(), properties.publishTimeout(),
+				Duration.ofSeconds(90), properties.maxAttempts(), properties.maxAmount(), properties.sweeper(),
+				properties.paging(), properties.metadata());
 
 		assertThatIllegalStateException().isThrownBy(() -> check(withLongLease).afterPropertiesSet())
 				.withMessage("events.lease (90 s) must be shorter than the visibility timeout of queue events-queue (90 s)");
@@ -39,8 +39,8 @@ class QueueSettingsCheckTest extends IntegrationTest {
 
 	@Test
 	void refusesMaxAttemptsEqualToMaxReceiveCount() {
-		EventsProperties withManyAttempts = new EventsProperties(properties.queues(), properties.lease(),
-				5, properties.maxAmount(), properties.sweeper(), properties.paging(),
+		EventsProperties withManyAttempts = new EventsProperties(properties.queues(), properties.publishTimeout(),
+				properties.lease(), 5, properties.maxAmount(), properties.sweeper(), properties.paging(),
 				properties.metadata());
 
 		assertThatIllegalStateException().isThrownBy(() -> check(withManyAttempts).afterPropertiesSet())
@@ -50,7 +50,7 @@ class QueueSettingsCheckTest extends IntegrationTest {
 	@Test
 	void refusesQueueWithoutRedrivePolicy() {
 		EventsProperties pointingAtDeadLetterQueue = new EventsProperties(
-				new EventsProperties.Queues("events-dlq"), Duration.ofSeconds(10),
+				new EventsProperties.Queues("events-dlq"), properties.publishTimeout(), Duration.ofSeconds(10),
 				properties.maxAttempts(), properties.maxAmount(), properties.sweeper(), properties.paging(),
 				properties.metadata());
 

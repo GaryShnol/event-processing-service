@@ -49,6 +49,7 @@ class EventProcessingServiceApplicationTests extends IntegrationTest {
 	@Test
 	void loadsDefaultsFromApplicationYaml() {
 		assertThat(properties.queues().events()).isEqualTo("events-queue");
+		assertThat(properties.publishTimeout()).isEqualTo(Duration.ofSeconds(3));
 		assertThat(properties.lease()).isEqualTo(Duration.ofSeconds(60));
 		assertThat(properties.maxAttempts()).isEqualTo(3);
 		assertThat(properties.maxAmount()).isEqualByComparingTo(new BigDecimal("10000.00"));

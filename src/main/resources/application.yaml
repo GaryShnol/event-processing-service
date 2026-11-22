@@ -30,6 +30,8 @@ events:
   paging:
     default-size: ${PAGE_DEFAULT_SIZE:20}
     max-size: ${PAGE_MAX_SIZE:100}
+    # page * size; deeper offsets walk that many index keys per request.
+    max-offset: ${PAGE_MAX_OFFSET:10000}
   metadata:
     max-entries: ${METADATA_MAX_ENTRIES:20}
     max-key-length: ${METADATA_MAX_KEY_LENGTH:64}

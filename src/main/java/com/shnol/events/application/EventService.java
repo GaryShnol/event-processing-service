@@ -68,6 +68,10 @@ public class EventService {
 			throw new InvalidQueryException("from", "must not be after to");
 		}
 		int pageSize = size == null ? properties.paging().defaultSize() : size;
+		int maxOffset = properties.paging().maxOffset();
+		if ((long) page * pageSize > maxOffset) {
+			throw new InvalidQueryException("page", "page * size must be at most " + maxOffset);
+		}
 		return repository.findByCustomer(customerId, from, to, status, PageRequest.of(page, pageSize));
 	}
 

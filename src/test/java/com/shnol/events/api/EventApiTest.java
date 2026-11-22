@@ -262,6 +262,8 @@ class EventApiTest extends IntegrationTest {
 			"size=101                                          | size",
 			"size=0                                            | size",
 			"page=-1                                           | page",
+			"page=501                                          | page",
+			"page=21474837&size=100                            | page",
 			"from=2026-09-02T00:00:00Z&to=2026-09-01T00:00:00Z | from",
 			"from=yesterday                                    | from",
 			"status=DONE                                       | status",

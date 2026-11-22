@@ -33,7 +33,7 @@ public record EventsProperties(
 			@Min(1) int batchSize) {
 	}
 
-	public record Paging(@Min(1) int defaultSize, @Min(1) int maxSize) {
+	public record Paging(@Min(1) int defaultSize, @Min(1) int maxSize, @Min(1) int maxOffset) {
 
 		@AssertTrue(message = "defaultSize must not exceed maxSize")
 		public boolean isDefaultSizeWithinMax() {

@@ -58,6 +58,7 @@ class EventProcessingServiceApplicationTests extends IntegrationTest {
 		assertThat(properties.sweeper().batchSize()).isEqualTo(100);
 		assertThat(properties.paging().defaultSize()).isEqualTo(20);
 		assertThat(properties.paging().maxSize()).isEqualTo(100);
+		assertThat(properties.paging().maxOffset()).isEqualTo(10000);
 		assertThat(properties.metadata()).isEqualTo(new EventsProperties.Metadata(20, 64, 256));
 	}
 

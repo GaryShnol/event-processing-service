@@ -24,6 +24,7 @@ class EventsPropertiesTest {
 					"events.sweeper.batch-size=100",
 					"events.paging.default-size=20",
 					"events.paging.max-size=100",
+					"events.paging.max-offset=10000",
 					"events.metadata.max-entries=20",
 					"events.metadata.max-key-length=64",
 					"events.metadata.max-value-length=256");

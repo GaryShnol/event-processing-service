@@ -25,6 +25,8 @@ import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -52,7 +54,7 @@ class EventServiceTest {
 		EventsProperties properties = new EventsProperties(new EventsProperties.Queues("events-queue"),
 				Duration.ofSeconds(3), Duration.ofSeconds(60), 3, new BigDecimal("10000.00"),
 				new EventsProperties.Sweeper(Duration.ofSeconds(30), Duration.ofMinutes(2), 100),
-				new EventsProperties.Paging(20, 100), new EventsProperties.Metadata(20, 64, 256));
+				new EventsProperties.Paging(20, 100, 10000), new EventsProperties.Metadata(20, 64, 256));
 		return new EventService(repository, publisher, Clock.fixed(NOW, ZoneOffset.UTC), properties);
 	}
 
@@ -125,6 +127,23 @@ class EventServiceTest {
 		assertThatExceptionOfType(InvalidQueryException.class)
 				.isThrownBy(() -> service().findForCustomer("customer-1", null, null, null, 0, 101))
 				.satisfies(e -> assertThat(e.parameter()).isEqualTo("size"));
+		verifyNoInteractions(repository);
+	}
+
+	@Test
+	void customerQueryAllowsAnOffsetEqualToTheConfiguredMaximum() {
+		when(repository.findByCustomer(eq("customer-1"), eq(null), eq(null), eq(null), eq(PageRequest.of(100, 100))))
+				.thenReturn(Page.empty());
+
+		assertThat(service().findForCustomer("customer-1", null, null, null, 100, 100)).isEmpty();
+	}
+
+	@ParameterizedTest(name = "page {0}, size {1}")
+	@CsvSource({ "101, 100", "501, ", "2147483647, 100" })
+	void customerQueryRejectsAnOffsetAboveTheConfiguredMaximumWithoutOverflowing(int page, Integer size) {
+		assertThatExceptionOfType(InvalidQueryException.class)
+				.isThrownBy(() -> service().findForCustomer("customer-1", null, null, null, page, size))
+				.satisfies(e -> assertThat(e.parameter()).isEqualTo("page"));
 		verifyNoInteractions(repository);
 	}
 

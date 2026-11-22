@@ -5,6 +5,7 @@ import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.shnol.events.IntegrationTest;
@@ -84,6 +85,9 @@ class FailureRecoveryTest extends IntegrationTest {
 				("\"message\":\"Processing failed, the message will be redelivered: "
 						+ "org.springframework.dao.DataAccessResourceFailureException: simulated outage\",\"eventId\":\"%s\"")
 						.formatted(eventId));
+		// Only the POST published: SQS redelivered the unacknowledged message. Had it been acknowledged after the
+		// exception, the sweeper would have re-published the stuck event and still reached PROCESSED.
+		verify(publisher, times(1)).publish(eventId);
 	}
 
 	@Test

@@ -34,7 +34,7 @@ services:
     # check use, and local AWS settings (ElasticMQ accepts any credentials).
     environment:
       SERVER_PORT: 8080
-      MONGODB_URI: mongodb://mongo:27017/events?serverSelectionTimeoutMS=5000
+      MONGODB_URI: mongodb://mongo:27017/events?serverSelectionTimeoutMS=5000&timeoutMS=10000
       AWS_REGION: us-east-1
       AWS_ACCESS_KEY_ID: local
       AWS_SECRET_ACCESS_KEY: local

@@ -34,7 +34,7 @@ flowchart TD
 - `GET /api/customers/{customerId}/events` filters `from`/`to` on `timestamp` (inclusive, ISO-8601), optionally by `status`, newest first (`timestamp`, then `eventId`). `page` starts at 0, `size` defaults to 20, maximum 100; a larger `size` or `from` after `to` returns `400`. The response is `{"content", "page", "size", "totalElements", "totalPages"}`. A customer with no events gets an empty page, not `404`.
 - Event types are `PAYMENT` and `REFUND`. Amounts are positive with at most 2 decimals and 15 integer digits; currency is an ISO 4217 code in upper case. `eventId` and `customerId` are 1 to 64 letters, digits, `_` or `-`. `timestamp` is stored to the millisecond. `metadata` is an optional map of strings with at most 20 entries, keys of 1 to 64 letters, digits, `_` or `-`, and values up to 256 characters; these three bounds are configurable. I allow 2 decimals for every currency, so currencies with 0 minor units (JPY) or 3 (KWD) are not checked against their real precision.
 - The business logic is simulated and touches nothing outside MongoDB: an amount above a configurable maximum (10000.00 by default) fails permanently.
-- `GlobalExceptionHandler` returns RFC 7807 `ProblemDetail`: 400 with an `errors` list naming each failing field or query parameter (a body that isn't valid JSON gets 400 without the list), 404, 409, 503 when MongoDB doesn't answer within 5 seconds, and 500 for anything else. No response carries a stack trace or a library's exception message.
+- `GlobalExceptionHandler` returns RFC 7807 `ProblemDetail`: 400 with an `errors` list naming each failing field or query parameter (a body that isn't valid JSON gets 400 without the list), 404, 409, 503 when MongoDB can't be reached within 5 seconds or an operation on it takes longer than 10 seconds (`serverSelectionTimeoutMS` and `timeoutMS` in the URI), and 500 for anything else. No response carries a stack trace or a library's exception message.
 
 ## Components
 
@@ -141,7 +141,7 @@ The lease makes MongoDB state change exactly once. It can't do that for a call t
 | Permanent business error | `FAILED` with a reason, no retry |
 | Transient error in processing | Logged with `eventId`, not acknowledged, redelivered after the visibility timeout |
 | Attempts exhausted | Once the last lease expires, the sweeper marks the event `FAILED` with "max attempts exceeded" |
-| MongoDB down during `POST` | `503`; the client retries; nothing is half-written |
+| MongoDB down or not answering during `POST` | `503` within 5 or 10 seconds; the client retries; nothing is half-written. The same operation timeout keeps a hung MongoDB from blocking workers and the sweeper |
 | MongoDB down during processing | Redelivered; after 5 receives the message goes to the DLQ, but MongoDB still shows the event unfinished, so the sweeper re-publishes it when MongoDB is back |
 | Publish fails after insert | Logged at WARN, `202`; the sweeper publishes it once `lastPublishedAt` is older than 2 minutes |
 | Duplicate delivery | Claim matches nothing; acknowledged |

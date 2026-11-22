@@ -39,7 +39,7 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.sqs.SqsAsyncClient;
 
 // The publisher sends to an SQS that accepts connections and never answers. The listener keeps the app's own
-// SQS client, whose long polls outlast the publish timeout, so it must go on receiving from the real queue.
+// SQS client; the second test guards that it still receives, though only the code shows the timeout isn't client-wide.
 @Import(SqsPublishTimeoutTest.SilentSqs.class)
 @ExtendWith(OutputCaptureExtension.class)
 class SqsPublishTimeoutTest extends IntegrationTest {
@@ -100,15 +100,28 @@ class SqsPublishTimeoutTest extends IntegrationTest {
 			return proxy;
 		}
 
-		@Bean
-		@Primary
-		EventPublisher publisherToSilentSqs(StallingProxy silentSqs, EventsProperties properties) {
-			SqsAsyncClient sqsClient = SqsAsyncClient.builder()
+		// Wrapped, not a bare SqsAsyncClient bean, which would replace the app's own auto-configured client.
+		@Bean(destroyMethod = "close")
+		SilentSqsClient silentSqsClient(StallingProxy silentSqs) {
+			return new SilentSqsClient(SqsAsyncClient.builder()
 					.endpointOverride(URI.create("http://localhost:" + silentSqs.port()))
 					.region(Region.US_EAST_1)
 					.credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("local", "local")))
-					.build();
-			return new SqsEventPublisher(SqsTemplate.newTemplate(sqsClient), properties);
+					.build());
+		}
+
+		@Bean
+		@Primary
+		EventPublisher publisherToSilentSqs(SilentSqsClient silentSqsClient, EventsProperties properties) {
+			return new SqsEventPublisher(SqsTemplate.newTemplate(silentSqsClient.client()), properties);
+		}
+
+		record SilentSqsClient(SqsAsyncClient client) implements AutoCloseable {
+
+			@Override
+			public void close() {
+				client.close();
+			}
 		}
 	}
 }

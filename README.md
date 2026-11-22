@@ -160,7 +160,7 @@ curl -s "http://localhost:8080/api/customers/customer-42/events?from=2026-11-01T
 {"content":[{"eventId":"evt-1001","customerId":"customer-42","type":"PAYMENT","amount":1250.50,"currency":"ILS","status":"PROCESSED","timestamp":"2026-11-01T10:15:00Z","createdAt":"2026-11-21T20:56:34.285Z","processedAt":"2026-11-21T20:56:34.379Z","failureReason":null}],"page":0,"size":10,"totalElements":1,"totalPages":1}
 ```
 
-A page larger than 100, `from` after `to`, or a page past the first 10,000 results (`page * size`) is rejected:
+A page larger than 100, `from` after `to`, or an offset (`page * size`) above 10,000 is rejected:
 
 ```
 curl -s -i "http://localhost:8080/api/customers/customer-42/events?size=500"

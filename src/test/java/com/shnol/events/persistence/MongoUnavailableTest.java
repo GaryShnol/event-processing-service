@@ -1,7 +1,7 @@
 package com.shnol.events.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import com.mongodb.ConnectionString;
@@ -19,7 +19,8 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.data.mongodb.UncategorizedMongoDbException;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.testcontainers.mongodb.MongoDBContainer;
 
@@ -32,7 +33,8 @@ class MongoUnavailableTest extends IntegrationTest {
 	@Autowired
 	private MongoDBContainer mongo;
 
-	// Both cases end in a MongoTimeoutException, which GlobalExceptionHandler answers with 503.
+	// GlobalExceptionHandler answers a resource failure, or an uncategorized error caused by a MongoTimeoutException,
+	// with 503. These tests pin the exception types the driver and Spring Data actually produce.
 
 	@Test
 	void unreachableMongoFailsWithinTheServerSelectionTimeout() {
@@ -40,9 +42,9 @@ class MongoUnavailableTest extends IntegrationTest {
 			MongoTemplate template = new MongoTemplate(client, "events");
 			long start = System.nanoTime();
 
-			assertThatExceptionOfType(DataAccessException.class)
-					.isThrownBy(() -> template.findById("evt-1", Event.class))
-					.withCauseInstanceOf(MongoTimeoutException.class);
+			assertThatThrownBy(() -> template.findById("evt-1", Event.class))
+					.isInstanceOfAny(DataAccessResourceFailureException.class, UncategorizedMongoDbException.class)
+					.hasCauseInstanceOf(MongoTimeoutException.class);
 
 			assertThat(Duration.ofNanos(System.nanoTime() - start)).isBetween(Duration.ofSeconds(4), Duration.ofSeconds(10));
 		}
@@ -58,9 +60,9 @@ class MongoUnavailableTest extends IntegrationTest {
 			long start = System.nanoTime();
 
 			// Without an operation timeout the read never returns, so a hang fails the test instead of blocking the build.
-			assertTimeoutPreemptively(Duration.ofSeconds(30), () -> assertThatExceptionOfType(DataAccessException.class)
-					.isThrownBy(() -> template.findById("evt-1", Event.class))
-					.withCauseInstanceOf(MongoTimeoutException.class));
+			assertTimeoutPreemptively(Duration.ofSeconds(30), () -> assertThatThrownBy(() -> template.findById("evt-1", Event.class))
+					.isInstanceOfAny(DataAccessResourceFailureException.class, UncategorizedMongoDbException.class)
+					.hasCauseInstanceOf(MongoTimeoutException.class));
 
 			assertThat(Duration.ofNanos(System.nanoTime() - start)).isBetween(Duration.ofSeconds(9), Duration.ofSeconds(15));
 		}

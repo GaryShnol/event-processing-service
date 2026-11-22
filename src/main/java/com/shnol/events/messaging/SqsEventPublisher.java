@@ -23,8 +23,8 @@ class SqsEventPublisher implements EventPublisher {
 	@Override
 	public void publish(String eventId) {
 		// The timeout is on this send, not on the shared SQS client: a client-wide timeout shorter than the
-		// listener's long-poll wait would cut off receiving. A timed-out send may still complete later, which
-		// is harmless because duplicate messages are expected.
+		// listener's long-poll wait would cut off receiving. The SDK call isn't cancelled: it holds a connection
+		// until the SDK gives up, and may still deliver late, which is harmless because duplicates are expected.
 		sqsTemplate.sendAsync(queueName, new EventMessage(eventId)).orTimeout(timeout.toMillis(), TimeUnit.MILLISECONDS).join();
 	}
 }

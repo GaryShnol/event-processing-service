@@ -22,15 +22,22 @@ public final class StallingProxy implements AutoCloseable {
 	public StallingProxy(String host, int port) throws IOException {
 		Thread.ofVirtual().start(() -> {
 			while (!server.isClosed()) {
+				Socket client;
 				try {
-					Socket client = server.accept();
+					client = server.accept();
+				}
+				catch (IOException e) {
+					return; // the proxy was closed
+				}
+				sockets.add(client);
+				try {
 					Socket upstream = new Socket(host, port);
-					sockets.addAll(List.of(client, upstream));
+					sockets.add(upstream);
 					pump(client, upstream);
 					pump(upstream, client);
 				}
 				catch (IOException e) {
-					return; // the proxy was closed
+					closeQuietly(client); // upstream unreachable: refuse this connection, keep accepting others
 				}
 			}
 		});
@@ -58,6 +65,15 @@ public final class StallingProxy implements AutoCloseable {
 				// a socket was closed: this direction of the connection is over
 			}
 		});
+	}
+
+	private static void closeQuietly(Socket socket) {
+		try {
+			socket.close();
+		}
+		catch (IOException e) {
+			// already broken; nothing left to release
+		}
 	}
 
 	@Override

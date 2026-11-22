@@ -22,7 +22,8 @@ public record EventsProperties(
 		@NotNull @Positive BigDecimal maxAmount,
 		@Valid @NotNull Sweeper sweeper,
 		@Valid @NotNull Paging paging,
-		@Valid @NotNull Metadata metadata) {
+		@Valid @NotNull Metadata metadata,
+		@Valid @NotNull Mongo mongo) {
 
 	public record Queues(@NotBlank String events) {
 	}
@@ -42,5 +43,10 @@ public record EventsProperties(
 	}
 
 	public record Metadata(@Min(1) int maxEntries, @Min(1) int maxKeyLength, @Min(1) int maxValueLength) {
+	}
+
+	public record Mongo(
+			@NotNull @DurationMin(millis = 100) Duration serverSelectionTimeout,
+			@NotNull @DurationMin(millis = 100) Duration operationTimeout) {
 	}
 }

@@ -5,7 +5,7 @@ spring:
   application:
     name: event-processing-service
   mongodb:
-    uri: ${MONGODB_URI:mongodb://localhost:27017/events?serverSelectionTimeoutMS=5000&timeoutMS=10000}
+    uri: ${MONGODB_URI:mongodb://localhost:27017/events}
   cloud:
     aws:
       sqs:
@@ -36,6 +36,11 @@ events:
     max-entries: ${METADATA_MAX_ENTRIES:20}
     max-key-length: ${METADATA_MAX_KEY_LENGTH:64}
     max-value-length: ${METADATA_MAX_VALUE_LENGTH:256}
+  mongo:
+    # How long a request waits for an unreachable MongoDB, and for any single operation (a MongoDB that
+    # accepts the connection but stops answering). Both end in a 503. Applied in code, whatever MONGODB_URI says.
+    server-selection-timeout: ${MONGO_SERVER_SELECTION_TIMEOUT:5s}
+    operation-timeout: ${MONGO_OPERATION_TIMEOUT:10s}
 
 logging:
   structured:

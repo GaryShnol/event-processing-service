@@ -27,7 +27,9 @@ class EventsPropertiesTest {
 					"events.paging.max-offset=10000",
 					"events.metadata.max-entries=20",
 					"events.metadata.max-key-length=64",
-					"events.metadata.max-value-length=256");
+					"events.metadata.max-value-length=256",
+					"events.mongo.server-selection-timeout=5s",
+					"events.mongo.operation-timeout=10s");
 
 	@Test
 	void bindsValidProperties() {
@@ -72,6 +74,11 @@ class EventsPropertiesTest {
 	@Test
 	void rejectsZeroMetadataEntries() {
 		assertRejected("events.metadata.max-entries=0", "metadata.maxEntries");
+	}
+
+	@Test
+	void rejectsMongoOperationTimeoutShorterThan100Milliseconds() {
+		assertRejected("events.mongo.operation-timeout=0s", "mongo.operationTimeout");
 	}
 
 	private void assertRejected(String property, String field) {

@@ -57,7 +57,7 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 		return databaseUnavailable(e);
 	}
 
-	// With timeoutMS set, the driver reports every timeout, server selection included, as a MongoTimeoutException
+	// With an operation timeout set, the driver reports every timeout, server selection included, as a MongoTimeoutException
 	// subtype that Spring Data translates to UncategorizedMongoDbException instead of a resource failure.
 	@ExceptionHandler
 	ProblemDetail handleUncategorizedDatabaseError(UncategorizedMongoDbException e) {

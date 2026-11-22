@@ -60,6 +60,7 @@ class EventProcessingServiceApplicationTests extends IntegrationTest {
 		assertThat(properties.paging().maxSize()).isEqualTo(100);
 		assertThat(properties.paging().maxOffset()).isEqualTo(10000);
 		assertThat(properties.metadata()).isEqualTo(new EventsProperties.Metadata(20, 64, 256));
+		assertThat(properties.mongo()).isEqualTo(new EventsProperties.Mongo(Duration.ofSeconds(5), Duration.ofSeconds(10)));
 	}
 
 	@Test
